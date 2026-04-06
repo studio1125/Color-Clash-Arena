@@ -20,3 +20,4 @@ MonoBehaviour:
   gravityModifier: 1
   hasCode: 1
   hasTeleporter: 1
+  isUnderwater: 0

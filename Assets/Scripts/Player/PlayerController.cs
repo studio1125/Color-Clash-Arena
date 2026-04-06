@@ -1,3 +1,4 @@
+using Photon.Pun;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,11 +12,13 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour {
 
     [Header("References")]
+    [SerializeField] private GameObject marker;
     private GameCore gameCore;
     private CameraController cameraController;
     private UIController uiController;
     private Animator animator;
     private Rigidbody2D rb;
+    private PhotonView photonView;
 
     [Header("Mechanics")]
     private Dictionary<MechanicType, bool> mechanicStatuses;
@@ -82,8 +85,11 @@ public class PlayerController : MonoBehaviour {
         cameraController = FindFirstObjectByType<CameraController>();
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
+        photonView = GetComponent<PhotonView>();
 
         isFacingRight = true;
+
+        marker.SetActive(photonView.IsMine); // only show marker for local player
 
     }
 
@@ -101,7 +107,7 @@ public class PlayerController : MonoBehaviour {
         }
 
         // jumping
-        if (IsMechanicEnabled(MechanicType.Jumping)) {
+        if (photonView.IsMine && IsMechanicEnabled(MechanicType.Jumping)) {
 
             if (Input.GetKey(jumpKey) && isGrounded)
                 Jump();
@@ -119,7 +125,7 @@ public class PlayerController : MonoBehaviour {
 
     private void FixedUpdate() {
 
-        if (IsMechanicEnabled(MechanicType.Movement)) { // don't return if false to allow for more code to be added to this method later
+        if (photonView.IsMine && IsMechanicEnabled(MechanicType.Movement)) { // don't return if false to allow for more code to be added to this method later
 
             rb.linearVelocity = new Vector2((isRotated ? -1f : 1f) * horizontalInput * moveSpeed, rb.linearVelocity.y); // adjust input based on rotation
 

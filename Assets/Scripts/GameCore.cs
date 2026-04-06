@@ -22,12 +22,7 @@ public class GameCore : MonoBehaviour {
     [Header("Quitting")]
     private bool isQuitting;
 
-    private void Awake() {
-
-        DontDestroyOnLoad(gameObject); // make sure game manager persists through scenes
-        startGravity = Physics2D.gravity;
-
-    }
+    private void Awake() => startGravity = Physics2D.gravity;
 
     // start function for each new scene
     private void OnLevelWasLoaded(int level) => isQuitting = false;

@@ -14,7 +14,9 @@ public class HoverButton : CustomButton {
     private Button button;
     private Coroutine textColorCoroutine;
 
-    private void Start() {
+    private new void Awake() {
+
+        base.Awake();
 
         button = GetComponent<Button>();
         startColor = text.color;

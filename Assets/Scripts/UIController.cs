@@ -99,7 +99,7 @@ public class UIController : MonoBehaviour {
     [SerializeField] private Button nextLevelButton;
     [SerializeField] private Color disabledColor;
 
-    public void Initialize() {
+    public void Awake() {
 
         claimManager = FindFirstObjectByType<PlayerClaimManager>();
         colorManager = FindFirstObjectByType<PlayerColorManager>();

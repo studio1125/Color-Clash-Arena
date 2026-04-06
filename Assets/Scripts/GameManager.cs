@@ -1,3 +1,4 @@
+using Photon.Pun;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -5,18 +6,12 @@ using UnityEngine.EventSystems;
 public abstract class GameManager : MonoBehaviour {
 
     [Header("References")]
+    [SerializeField] private PlayerController playerPrefab;
     private GameCore gameCore;
     protected PlayerController playerController;
     protected PlayerClaimManager claimManager;
     protected UIController uiController;
     private CameraController cameraController;
-
-    [Header("Constant Prefabs")]
-    [SerializeField] private PlayerController playerPrefab;
-    [SerializeField] private GameCore gameCorePrefab;
-    [SerializeField] private LevelAudioManager audioManagerPrefab;
-    [SerializeField] private UIController canvasPrefab;
-    [SerializeField] private EventSystem eventSystemPrefab;
 
     [Header("Level")]
     [SerializeField] protected Level level;
@@ -51,16 +46,9 @@ public abstract class GameManager : MonoBehaviour {
             levelClaimables.Add(claimable);
 
         gameCore = FindFirstObjectByType<GameCore>();
-
-        // instantiate new game core if it doesn't exist
-        if (gameCore == null)
-            gameCore = Instantiate(gameCorePrefab);
-
-        Instantiate(audioManagerPrefab).Initialize(); // instantiate audio manager
+        cameraController = FindFirstObjectByType<CameraController>();
 
         // checkpoints
-        SpawnPlayer(); // IMPORTANT: spawn before canvas and event system
-
         if (checkpointsParent != null) { // having checkpoints is optional, so make sure level has them
 
             checkpoints = checkpointsParent.GetComponentsInChildren<Checkpoint>();
@@ -70,20 +58,16 @@ public abstract class GameManager : MonoBehaviour {
 
         }
 
-        // destroy all canvases
-        foreach (UIController canvas in FindObjectsByType<UIController>(FindObjectsSortMode.None)) // IMPORTANT: make sure type is UIController and not Canvas
-            Destroy(canvas.gameObject);
+        uiController = FindFirstObjectByType<UIController>();
 
-        // destroy all event systems
-        foreach (EventSystem eventSystem in FindObjectsByType<EventSystem>(FindObjectsSortMode.None))
-            Destroy(eventSystem.gameObject);
+        // destroy any existing player controllers in scene
+        foreach (PlayerController obj in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
+            Destroy(obj.gameObject);
 
-        uiController = Instantiate(canvasPrefab); // instantiate canvas
-        uiController.Initialize();
-
+        playerController = PhotonNetwork.Instantiate(playerPrefab.name, playerSpawn.position + new Vector3(0f, playerPrefab.transform.localScale.y / 2f, 0f), Quaternion.identity).GetComponent<PlayerController>(); // instantiate player prefab for multiplayer
         playerController.Initialize(uiController, level.GetSpeedModifier(), level.GetJumpModifier(), level.IsUnderwater()); // initialize player controller
 
-        Instantiate(eventSystemPrefab); // instantiate event system
+        cameraController.SetTarget(playerController.transform);
 
         // claims
         claimManager = FindFirstObjectByType<PlayerClaimManager>();
@@ -106,21 +90,6 @@ public abstract class GameManager : MonoBehaviour {
     }
 
     public abstract void Initialize();
-
-    protected void SpawnPlayer() {
-
-        // destroy existing players in scene
-        foreach (PlayerController obj in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
-            Destroy(obj.gameObject);
-
-        cameraController = FindFirstObjectByType<CameraController>(); // IMPORTANT: SET THIS AFTER PLAYERS ARE DESTROYED
-        playerController = Instantiate(playerPrefab, playerSpawn.position + new Vector3(0f, playerPrefab.transform.localScale.y / 2f, 0f), Quaternion.identity);
-        cameraController.SetTarget(playerController.transform); // spawn player
-
-        foreach (Interactable interactable in FindObjectsByType<Interactable>(FindObjectsSortMode.None))
-            interactable.SetPlayerController(playerController); // set player controller for all interactables (IMPORTANT: DO THIS AFTER PLAYER IS SPAWNED)
-
-    }
 
     protected void SpawnEnemies() {
 

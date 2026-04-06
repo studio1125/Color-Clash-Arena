@@ -66,7 +66,4 @@ public abstract class Interactable : MonoBehaviour {
         fadeCoroutine = null;
 
     }
-
-    public void SetPlayerController(PlayerController playerController) { this.playerController = playerController; }
-
 }
