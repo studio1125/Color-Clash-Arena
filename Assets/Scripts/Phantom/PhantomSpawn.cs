@@ -1,12 +1,12 @@
+using Photon.Pun;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PhantomSpawn : MonoBehaviour {
 
     [Header("Spawn")]
-    [SerializeField] private PhantomController phantomPrefab;
-    [SerializeField] private Gun gun;
+    [SerializeField] private PhantomController phantomPrefab; // must be in Resources/ folder
+    [SerializeField] private Gun gun; // must be in Resources/Guns/ folder
     private PhantomController currPhantom;
     private bool isFlipped;
 
@@ -23,14 +23,13 @@ public class PhantomSpawn : MonoBehaviour {
     private void Awake() {
 
         isFlipped = transform.right.x < 0f;
-
         patrolRoute = GetComponentInChildren<PhantomPatrolRoute>();
 
     }
 
     public void SpawnEnemy() {
 
-        currPhantom = Instantiate(phantomPrefab, transform.position + new Vector3(0f, phantomPrefab.transform.localScale.y / 2f, 0f), isFlipped ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity);
+        currPhantom = PhotonNetwork.Instantiate(phantomPrefab.name, transform.position + new Vector3(0f, phantomPrefab.transform.localScale.y / 2f, 0f), isFlipped ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity).GetComponent<PhantomController>();
         currPhantom.Initialize(this, gun, isFlipped, patrolRoute.GetPatrolPoints());
 
     }
@@ -50,21 +49,19 @@ public class PhantomSpawn : MonoBehaviour {
             while (claimablePlatform.GetClaimer() == EntityType.Player) // don't respawn enemy if claimed by player
                 yield return null;
 
-        if (respawnEnabled) // check again in case respawn was disabled while waiting
+        if (respawnEnabled && PhotonNetwork.IsMasterClient) // check again in case respawn was disabled while waiting; only MasterClient should spawn to avoid duplicates
             SpawnEnemy();
 
     }
 
-    public bool IsPhantomAlive() { return currPhantom != null; }
+    public bool IsPhantomAlive() => currPhantom != null;
 
-    public bool IsFlipped() { return isFlipped; }
+    public bool IsFlipped() => isFlipped;
 
-    public Transform[] GetPatrolPoints() { return patrolRoute.GetPatrolPoints(); }
+    public bool IsRespawnEnabled() => respawnEnabled;
 
-    public bool IsRespawnEnabled() { return respawnEnabled; }
+    public void SetRespawnEnabled(bool respawnEnabled) => this.respawnEnabled = respawnEnabled;
 
-    public void SetRespawnEnabled(bool respawnEnabled) { this.respawnEnabled = respawnEnabled; }
-
-    public float GetRespawnWaitDuration() { return respawnWaitDuration; }
+    public float GetRespawnWaitDuration() => respawnWaitDuration;
 
 }

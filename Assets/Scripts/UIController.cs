@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Photon.Pun;
 
 public class UIController : MonoBehaviour {
 
@@ -18,6 +19,7 @@ public class UIController : MonoBehaviour {
     private CodeManager codeManager;
     private Animator animator;
     private Coroutine menuFadeCoroutine;
+    private bool isInitialized;
 
     [Header("HUD")]
     [SerializeField] private CanvasGroup playerHUD;
@@ -99,17 +101,27 @@ public class UIController : MonoBehaviour {
     [SerializeField] private Button nextLevelButton;
     [SerializeField] private Color disabledColor;
 
-    public void Awake() {
+    public void Initialize() {
 
-        claimManager = FindFirstObjectByType<PlayerClaimManager>();
-        colorManager = FindFirstObjectByType<PlayerColorManager>();
-        playerController = FindFirstObjectByType<PlayerController>();
-        effectManager = FindFirstObjectByType<PlayerEffectManager>();
-        gunManager = FindFirstObjectByType<PlayerGunManager>();
-        healthManager = FindFirstObjectByType<PlayerHealthManager>();
         gameCore = FindFirstObjectByType<GameCore>();
         gameManager = FindFirstObjectByType<GameManager>();
         animator = GetComponent<Animator>();
+
+        // find the local player specifically; in multiplayer there will be multiple PlayerControllers so we use photonView.IsMine to get only the one this client controls
+        foreach (PlayerController playerController in FindObjectsByType<PlayerController>(FindObjectsSortMode.None)) {
+
+            if (playerController.GetComponent<PhotonView>().IsMine) {
+
+                this.playerController = playerController;
+                claimManager = playerController.GetComponent<PlayerClaimManager>();
+                colorManager = playerController.GetComponent<PlayerColorManager>();
+                effectManager = playerController.GetComponent<PlayerEffectManager>();
+                gunManager = playerController.GetComponent<PlayerGunManager>();
+                healthManager = playerController.GetComponent<PlayerHealthManager>();
+                break;
+
+            }
+        }
 
         // player HUD
         playerHUD.alpha = 0f; // reset alpha for fade
@@ -163,7 +175,7 @@ public class UIController : MonoBehaviour {
         pauseMainMenuButton.onClick.AddListener(LoadMainMenu); // load main menu
 
         // code
-        if (gameManager is LevelManager manager && manager.LevelHasCode()) { // make sure level has code to avoid null errors  (make sure game manager is level manager)
+        if (gameManager is LevelManager levelManager && levelManager.LevelHasCode()) { // make sure level has code to avoid null errors  (make sure game manager is level manager)
 
             codeManager = FindFirstObjectByType<CodeManager>();
             vaultController = FindFirstObjectByType<VaultController>();
@@ -193,6 +205,12 @@ public class UIController : MonoBehaviour {
         replayButton.onClick.AddListener(ReloadLevel);
         mainMenuButton.onClick.AddListener(LoadMainMenu);
         nextLevelButton.onClick.AddListener(LoadNextLevel);
+
+        isInitialized = true;
+
+        // notify managers that UIController is initialized; flushes any updates that were deferred because uiController wasn't assigned yet when they first fired
+        healthManager.OnUIControllerInitialized(this);
+        gunManager.OnUIControllerInitialized(this);
 
     }
 
@@ -237,6 +255,10 @@ public class UIController : MonoBehaviour {
 
         List<Gun> guns = gunManager.GetGuns();
 
+        // guns list is initialized in Awake but populated in Start; guard here in case
+        // UpdateGunCycle is called in the same frame before Start has finished adding guns
+        if (guns == null || guns.Count == 0) return;
+
         if (guns.Count == 1) {
 
             gunIconTop.sprite = blankGunSprite; // top gun is blank
@@ -277,7 +299,7 @@ public class UIController : MonoBehaviour {
 
     }
 
-    public void UpdateHealth() {
+    public void UpdateHealth(HealthManager healthManager) { // health manager is passed in to ensure that the health update is for the correct player
 
         if (healthLerpCoroutine != null)
             StopCoroutine(healthLerpCoroutine);
@@ -676,6 +698,8 @@ public class UIController : MonoBehaviour {
         healthBarParent.alpha = 0f; // reset alpha for fade
 
     }
+
+    public bool IsInitialized() => isInitialized;
 
     private IEnumerator FadeMenu(CanvasGroup menu, float targetOpacity, float fadeDuration, bool unscaledTime = false) {
 

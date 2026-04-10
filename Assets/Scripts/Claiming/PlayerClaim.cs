@@ -7,13 +7,15 @@ public class PlayerClaim : EntityClaim {
     private Color claimColor;
     private EffectType effectType;
     private float multiplierAddition;
+    private int ownerId;
 
-    public void Claim(Claimable claimable, Color claimColor, EffectType effectType) {
+    public void Claim(Claimable claimable, Color claimColor, EffectType effectType, int ownerId) {
 
         this.claimable = claimable;
         this.claimColor = claimColor;
         this.effectType = effectType;
-        this.multiplierAddition = GetComponent<Claimable>().GetMultiplierAddition();
+        this.ownerId = ownerId;
+        this.multiplierAddition = claimable.GetMultiplierAddition();
         gameManager.AddClaim(this);
 
     }
@@ -25,12 +27,16 @@ public class PlayerClaim : EntityClaim {
 
     }
 
-    public Claimable GetClaimable() { return claimable; }
+    public Claimable GetClaimable() => claimable;
 
-    public Color GetColor() { return claimColor; }
+    public Color GetColor() => claimColor;
 
-    public EffectType GetEffectType() { return effectType; }
+    public EffectType GetEffectType() => effectType;
 
-    public float GetMultiplierAddition() { return multiplierAddition; }
+    public bool IsOwner(int playerId) => ownerId == playerId;
+
+    public int GetOwnerId() => ownerId;
+
+    public float GetMultiplierAddition() => multiplierAddition;
 
 }

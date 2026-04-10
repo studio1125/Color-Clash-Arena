@@ -1,14 +1,10 @@
-using System.Collections;
-using System.Collections.Generic;
+using Photon.Pun;
 using UnityEngine;
 
-public class Bullet : MonoBehaviour {
+public class Bullet : MonoBehaviourPun {
 
     [Header("References")]
     private Rigidbody2D rb;
-
-    [Header("Shooting")]
-    private EntityType shooterType;
 
     [Header("Movement")]
     [SerializeField] private float speed;
@@ -22,11 +18,11 @@ public class Bullet : MonoBehaviour {
     private Vector3 spawnPos;
 
     // start function
-    public void Initialize(EntityType shooterType, float damage, Vector3 spawnPos, float maxRange, Collider2D shooterCollider) {
+    public void Initialize(float damage, Vector3 spawnPos, float maxRange, Collider2D shooterCollider) {
 
         rb = GetComponent<Rigidbody2D>();
         rb.linearVelocity = transform.right * speed;
-        this.shooterType = shooterType;
+
         this.damage = damage;
         this.spawnPos = spawnPos;
         this.maxRange = maxRange;
@@ -44,22 +40,22 @@ public class Bullet : MonoBehaviour {
 
     private void OnCollisionEnter2D(Collision2D collision) {
 
-        bool? deathCaused = false; // to prevent impact effect when something dies (for better looking gfx)
+        // routes damage through the correct RequestTakeDamage method depending on target type:
+        // - PlayerHealthManager routes damage to the player's owner via RPC
+        // - PhantomHealthManager routes damage to MasterClient via RPC
+        // both avoid the bug of double-processing damage on both clients
 
-        if (shooterType == EntityType.Player)
-            deathCaused = collision.transform.GetComponent<PhantomHealthManager>()?.TakeDamage(damage); // damage phantom if player is shooter
-        else if (shooterType == EntityType.Phantom)
-            deathCaused = collision.transform.GetComponent<PlayerHealthManager>()?.TakeDamage(damage); // damage player if phantom is shooter
+        if (collision.transform.TryGetComponent(out HealthManager healthManager))
+            healthManager.RequestTakeDamage(damage);
 
-        if (deathCaused != null && !(bool) deathCaused)
-            SelfDestruct();
+        SelfDestruct();
 
     }
 
     private void SelfDestruct() {
 
         Instantiate(impactEffect, transform.position, transform.rotation);
-        Destroy(gameObject);
+        PhotonNetwork.Destroy(gameObject); // use PhotonNetwork.Destroy so the bullet is removed on all clients
 
     }
 }

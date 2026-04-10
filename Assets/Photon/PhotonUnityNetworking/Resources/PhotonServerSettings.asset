@@ -28,7 +28,7 @@ MonoBehaviour:
     AuthMode: 0
     EnableLobbyStatistics: 0
     NetworkLogging: 1
-  DevRegion: 
+  DevRegion: usw
   PunLogging: 0
   EnableSupportLogger: 0
   RunInBackground: 1
@@ -39,6 +39,28 @@ MonoBehaviour:
   - DestroySpaceship
   - Fire
   - RespawnSpaceship
+  - TakeDamage
+  - RPC_SyncColorIndex
+  - SyncColorIndex
+  - SyncGunIndex
+  - RPC_Die
+  - RPC_TakeDamage
+  - RPC_SyncGunIndex
+  - RPC_TakeDamageMaster
+  - RPC_TakeDamageOwner
+  - RPC_ShowTracer
+  - RPC_LoadLevel
+  - RPC_Flip
+  - RPC_ResetClaim
+  - RPC_StartClaim
+  - RPC_Claim
+  - RPC_SetGun
+  - RPC_Initialize
+  - RPC_Reload
+  - RPC_SyncReload
+  - RPC_SyncPhantomReload
+  - RPC_SyncPlayerReload
+  - RPC_StartReload
   DisableAutoOpenWizard: 1
   ShowSettings: 0
-  DevRegionSetOnce: 0
+  DevRegionSetOnce: 1

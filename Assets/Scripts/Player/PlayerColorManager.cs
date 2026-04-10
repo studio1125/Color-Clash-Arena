@@ -1,9 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using Photon.Pun;
 
 [RequireComponent(typeof(PlayerController))]
-public class PlayerColorManager : MonoBehaviour {
+public class PlayerColorManager : MonoBehaviourPun {
 
     [Header("References")]
     private PlayerController playerController;
@@ -22,20 +21,27 @@ public class PlayerColorManager : MonoBehaviour {
     private void Start() {
 
         playerController = GetComponent<PlayerController>();
-        uiController = FindFirstObjectByType<UIController>();
         spriteRenderer = GetComponent<SpriteRenderer>();
 
         currColorIndex = 0;
         spriteRenderer.color = playerColors[currColorIndex].GetSpriteColor();
 
-        uiController.UpdateEffectText(playerColors[currColorIndex]); // update effect text
-        uiController.UpdateClaimablesHUD(); // update claimables HUD (for selected indicator)
+        // only update UI for the local player
+        if (photonView.IsMine) {
+
+            uiController = FindFirstObjectByType<UIController>();
+            uiController.UpdateEffectText(playerColors[currColorIndex]); // update effect text
+            uiController.UpdateClaimablesHUD(); // update claimables HUD (for selected indicator)
+
+        }
 
         canColorCycle = true;
 
     }
 
     private void Update() {
+
+        if (!photonView.IsMine) return; // only local player can switch their own color
 
         // color switching
         if (playerController.IsMechanicEnabled(MechanicType.ColorCycling)) // don't return if false to allow for more code to be added to this method later
@@ -54,25 +60,35 @@ public class PlayerColorManager : MonoBehaviour {
         if (currColorIndex >= playerColors.Length)
             currColorIndex = 0;
 
-        spriteRenderer.color = playerColors[currColorIndex].GetSpriteColor();
-
-        uiController.UpdateEffectText(playerColors[currColorIndex]); // update effect text
-        uiController.UpdateClaimablesHUD(); // update claimables HUD (for selected indicator)
+        // sync color change to all other clients via RPC
+        photonView.RPC(nameof(RPC_SyncColorIndex), RpcTarget.AllBuffered, currColorIndex);
 
         // start cooldown
         canColorCycle = false;
-        Invoke("ColorCycleCooldownComplete", colorCycleCooldown);
+        Invoke(nameof(ColorCycleCooldownComplete), colorCycleCooldown);
 
     }
 
-    private void ColorCycleCooldownComplete() {
+    // RPC: syncs color index change to all clients (AllBuffered so late joiners also get it)
+    [PunRPC]
+    private void RPC_SyncColorIndex(int colorIndex) {
 
-        canColorCycle = true;
+        currColorIndex = colorIndex;
+        spriteRenderer.color = playerColors[currColorIndex].GetSpriteColor();
 
+        // only update UI on the local player's screen
+        if (photonView.IsMine) {
+
+            uiController.UpdateEffectText(playerColors[currColorIndex]); // update effect text
+            uiController.UpdateClaimablesHUD(); // update claimables HUD (for selected indicator)
+
+        }
     }
 
-    public PlayerColor[] GetPlayerColors() { return playerColors; }
+    private void ColorCycleCooldownComplete() => canColorCycle = true;
 
-    public PlayerColor GetCurrentPlayerColor() { return playerColors[currColorIndex]; }
+    public PlayerColor[] GetPlayerColors() => playerColors;
+
+    public PlayerColor GetCurrentPlayerColor() => playerColors[currColorIndex];
 
 }

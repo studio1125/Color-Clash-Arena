@@ -9,7 +9,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerEffectManager))]
 [RequireComponent(typeof(PlayerGunManager))]
 [RequireComponent(typeof(PlayerHealthManager))]
-public class PlayerController : MonoBehaviour {
+public class PlayerController : MonoBehaviourPun {
 
     [Header("References")]
     [SerializeField] private GameObject marker;
@@ -18,7 +18,6 @@ public class PlayerController : MonoBehaviour {
     private UIController uiController;
     private Animator animator;
     private Rigidbody2D rb;
-    private PhotonView photonView;
 
     [Header("Mechanics")]
     private Dictionary<MechanicType, bool> mechanicStatuses;
@@ -85,7 +84,6 @@ public class PlayerController : MonoBehaviour {
         cameraController = FindFirstObjectByType<CameraController>();
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
-        photonView = GetComponent<PhotonView>();
 
         isFacingRight = true;
 
@@ -94,6 +92,8 @@ public class PlayerController : MonoBehaviour {
     }
 
     private void Update() {
+
+        if (!photonView.IsMine) return; // only allow local player to control their own player
 
         // ground check
         isGrounded = Physics2D.OverlapCircle(leftFoot.position, groundCheckRadius, gameCore.GetEnvironmentMask()) != null || Physics2D.OverlapCircle(leftFoot.position, groundCheckRadius, phantomMask) || Physics2D.OverlapCircle(rightFoot.position, groundCheckRadius, gameCore.GetEnvironmentMask()) != null || Physics2D.OverlapCircle(rightFoot.position, groundCheckRadius, phantomMask) != null; // check both feet for ground check & check for separate phantom mask too (overlap circle allows for mantle mechanic | phantom shouldn't be included in environment mask)
@@ -107,7 +107,7 @@ public class PlayerController : MonoBehaviour {
         }
 
         // jumping
-        if (photonView.IsMine && IsMechanicEnabled(MechanicType.Jumping)) {
+        if (IsMechanicEnabled(MechanicType.Jumping)) {
 
             if (Input.GetKey(jumpKey) && isGrounded)
                 Jump();
@@ -125,7 +125,9 @@ public class PlayerController : MonoBehaviour {
 
     private void FixedUpdate() {
 
-        if (photonView.IsMine && IsMechanicEnabled(MechanicType.Movement)) { // don't return if false to allow for more code to be added to this method later
+        if (!photonView.IsMine) return; // only allow local player to control their own player
+
+        if (IsMechanicEnabled(MechanicType.Movement)) { // don't return if false to allow for more code to be added to this method later
 
             rb.linearVelocity = new Vector2((isRotated ? -1f : 1f) * horizontalInput * moveSpeed, rb.linearVelocity.y); // adjust input based on rotation
 
@@ -148,6 +150,7 @@ public class PlayerController : MonoBehaviour {
     }
 
     private void Jump() => rb.linearVelocity = transform.up * new Vector2(rb.linearVelocity.x, jumpForce); // multiply by transform.up to make sure jump is always up relative to player
+
     public void GravityFlip(float rotationDuration) {
 
         if (isRotated)

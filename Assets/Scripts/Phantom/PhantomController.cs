@@ -1,14 +1,12 @@
-using System.Collections;
-using System.Collections.Generic;
 using TMPro;
-using UnityEditor;
 using UnityEngine;
+using Photon.Pun;
 
 [RequireComponent(typeof(PhantomColorManager))]
 [RequireComponent(typeof(PhantomGunManager))]
 [RequireComponent(typeof(PhantomHealthManager))]
 [RequireComponent(typeof(PhantomStateManager))]
-public class PhantomController : MonoBehaviour {
+public class PhantomController : MonoBehaviourPun {
 
     [Header("References")]
     private PhantomHealthManager healthManager;
@@ -41,13 +39,11 @@ public class PhantomController : MonoBehaviour {
 
     public void Initialize(PhantomSpawn phantomSpawn, Gun gun, bool isFlipped, Transform[] patrolPoints) {
 
-        colorManager = GetComponent<PhantomColorManager>();
-        gunManager = GetComponent<PhantomGunManager>();
-        healthManager = GetComponent<PhantomHealthManager>();
-        stateManager = GetComponent<PhantomStateManager>();
-        rb = GetComponent<Rigidbody2D>();
+        // only run on MasterClient to prevent double-initialization in multiplayer, though we can check again here just in case
+        if (!PhotonNetwork.IsMasterClient) return;
 
-        nameText.text = enemyName;
+        gunManager = GetComponent<PhantomGunManager>();
+        stateManager = GetComponent<PhantomStateManager>();
 
         this.phantomSpawn = phantomSpawn;
 
@@ -59,7 +55,20 @@ public class PhantomController : MonoBehaviour {
 
     }
 
+    private void Start() {
+
+        healthManager = GetComponent<PhantomHealthManager>();
+        colorManager = GetComponent<PhantomColorManager>();
+        rb = GetComponent<Rigidbody2D>();
+
+        nameText.text = enemyName;
+
+    }
+
     private void Update() {
+
+        // only MasterClient runs phantom AI and claiming logic (to prevent double-claiming in multiplayer)
+        if (!PhotonNetwork.IsMasterClient) return;
 
         // if phantom is standing on something, claim it
         Collider2D leftCollider = Physics2D.OverlapCircle(leftFoot.position, groundCheckRadius, environmentMask);
@@ -88,8 +97,8 @@ public class PhantomController : MonoBehaviour {
 
     }
 
-    public PhantomSpawn GetEnemySpawn() { return phantomSpawn; }
+    public PhantomSpawn GetEnemySpawn() => phantomSpawn;
 
-    public bool IsFacingRight() { return isFacingRight; }
+    public bool IsFacingRight() => isFacingRight;
 
 }

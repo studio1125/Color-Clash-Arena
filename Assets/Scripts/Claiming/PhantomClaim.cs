@@ -1,14 +1,6 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 public class PhantomClaim : EntityClaim {
 
-    public void Claim() {
-
-        gameManager.AddClaim(this);
-
-    }
+    public void Claim() => gameManager.AddClaim(this);
 
     private void OnDisable() {
 

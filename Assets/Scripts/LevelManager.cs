@@ -17,9 +17,14 @@ public class LevelManager : GameManager {
 
         if (claim is PlayerClaim playerClaim) {
 
-            playerClaims.Add(playerClaim);
-            claimManager.AddClaimable(playerClaim.GetColor(), playerClaim.GetEffectType(), playerClaim.GetMultiplierAddition());
-            levelCurrClaimables++;
+            // only add claim if the local player is the owner of the claim
+            if (playerController.photonView.OwnerActorNr == playerClaim.GetOwnerId()) {
+
+                playerClaims.Add(playerClaim);
+                claimManager.AddClaimable(playerClaim.GetColor(), playerClaim.GetEffectType(), playerClaim.GetMultiplierAddition());
+                levelCurrClaimables++;
+
+            }
 
             /* FOR ENDING GAME WHEN EVERYTHING IS CLAIMED
             CheckLevelClear(); // check if player has claimed all platforms
@@ -40,9 +45,14 @@ public class LevelManager : GameManager {
 
         if (claim is PlayerClaim playerClaim) {
 
-            playerClaims.Remove(playerClaim);
-            claimManager.RemoveClaimable(playerClaim.GetColor(), playerClaim.GetEffectType(), playerClaim.GetMultiplierAddition());
-            levelCurrClaimables--;
+            // only remove claim if player is the owner of the claim
+            if (playerController.photonView.OwnerActorNr == playerClaim.GetOwnerId()) {
+
+                playerClaims.Remove(playerClaim);
+                claimManager.RemoveClaimable(playerClaim.GetColor(), playerClaim.GetEffectType(), playerClaim.GetMultiplierAddition());
+                levelCurrClaimables--;
+
+            }
 
             // update teleporter because some track claimables
             if (level.HasTeleporter() && levelClaimables.Contains(playerClaim.GetClaimable()))

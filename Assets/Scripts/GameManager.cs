@@ -1,12 +1,11 @@
 using Photon.Pun;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 public abstract class GameManager : MonoBehaviour {
 
     [Header("References")]
-    [SerializeField] private PlayerController playerPrefab;
+    [SerializeField] private PlayerController playerPrefab; // must be inside the Resources/ folder
     private GameCore gameCore;
     protected PlayerController playerController;
     protected PlayerClaimManager claimManager;
@@ -39,6 +38,9 @@ public abstract class GameManager : MonoBehaviour {
 
     protected void Awake() {
 
+        PhotonNetwork.SendRate = 30; // frequency of outgoing packets
+        PhotonNetwork.SerializationRate = 30; // frequency of OnPhotonSerializeView calls
+
         // add all claimables to list
         levelClaimables = new List<Claimable>();
 
@@ -58,19 +60,21 @@ public abstract class GameManager : MonoBehaviour {
 
         }
 
-        uiController = FindFirstObjectByType<UIController>();
+        uiController = FindFirstObjectByType<UIController>(); // set early for player controller initialization
 
         // destroy any existing player controllers in scene
         foreach (PlayerController obj in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
-            Destroy(obj.gameObject);
+            Destroy(obj.gameObject); // don't use PhotonNetwork.Destroy because these player controllers aren't networked objects until they are instantiated by PhotonNetwork.Instantiate
 
         playerController = PhotonNetwork.Instantiate(playerPrefab.name, playerSpawn.position + new Vector3(0f, playerPrefab.transform.localScale.y / 2f, 0f), Quaternion.identity).GetComponent<PlayerController>(); // instantiate player prefab for multiplayer
         playerController.Initialize(uiController, level.GetSpeedModifier(), level.GetJumpModifier(), level.IsUnderwater()); // initialize player controller
 
+        uiController.Initialize(); // initialize UI controller after player controller so that the correct player controller is found by the UI controller
+
         cameraController.SetTarget(playerController.transform);
 
         // claims
-        claimManager = FindFirstObjectByType<PlayerClaimManager>();
+        claimManager = playerController.GetComponent<PlayerClaimManager>(); // get claim manager from local player instead of FindFirstObjectByType to avoid getting remote player's component
         claimManager.transform.position = playerSpawn.position;
 
         playerClaims = new List<PlayerClaim>();
@@ -80,7 +84,13 @@ public abstract class GameManager : MonoBehaviour {
 
     protected void Start() {
 
-        SpawnEnemies(); // to allow enemy spawn class to run awake method first
+        // destroy existing enemies in scene (done for all clients, not just MasterClient)
+        foreach (PhantomController obj in FindObjectsByType<PhantomController>(FindObjectsSortMode.None))
+            Destroy(obj.gameObject); // don't use PhotonNetwork.Destroy because these enemies aren't networked objects until they are spawned by PhantomSpawn.SpawnEnemy
+
+        // only MasterClient spawns enemies; they are networked objects so spawning on all clients would create duplicates
+        if (PhotonNetwork.IsMasterClient)
+            SpawnEnemies();
 
         gameCore.ResetGravity(); // reset gravity to modify original gravity, not current one
         gameCore.ModifyGravity(level.GetGravityModifier());
@@ -93,12 +103,10 @@ public abstract class GameManager : MonoBehaviour {
 
     protected void SpawnEnemies() {
 
-        // destroy existing enemies in scene
-        foreach (PhantomController obj in FindObjectsByType<PhantomController>(FindObjectsSortMode.None))
-            Destroy(obj.gameObject);
+        if (!PhotonNetwork.IsMasterClient) return; // only MasterClient should spawn enemies; they are networked objects so spawning on all clients would create duplicates
 
         foreach (PhantomSpawn enemySpawn in FindObjectsByType<PhantomSpawn>(FindObjectsSortMode.None))
-            enemySpawn.SpawnEnemy(); // spawn enemy
+            enemySpawn.SpawnEnemy(); // spawn enemy (PhantomSpawn.SpawnEnemy uses PhotonNetwork.Instantiate)
 
     }
 

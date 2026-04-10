@@ -11,6 +11,11 @@ public class MenuController : MonoBehaviour {
     private MenuManager menuManager;
     private Coroutine menuFadeCoroutine;
 
+    [Header("Connecting")]
+    [SerializeField] private CanvasGroup connectingScreen;
+    [SerializeField] private float connectingScreenFadeDuration;
+    private Coroutine connectionCoroutine;
+
     [Header("Menu")]
     [SerializeField] private CanvasGroup menuScreen;
     [SerializeField] private float menuScreenFadeDuration;
@@ -30,9 +35,9 @@ public class MenuController : MonoBehaviour {
     [SerializeField] private float lobbyScreenFadeDuration;
     [SerializeField] private Button lobbyScreenCloseButton;
 
-    [Header("Connecting")]
-    [SerializeField] private CanvasGroup connectingScreen;
-    [SerializeField] private float connectingScreenFadeDuration;
+    [Header("Room")]
+    [SerializeField] private CanvasGroup roomScreen;
+    [SerializeField] private float roomScreenFadeDuration;
 
     [Header("Loading")]
     [SerializeField] private CanvasGroup loadingScreen;
@@ -50,11 +55,14 @@ public class MenuController : MonoBehaviour {
         // menu
         playButton.onClick.AddListener(Play);
         tutorialButton.onClick.AddListener(PlayTutorial);
-        instructionsButton.onClick.AddListener(ShowInstructions);
+        instructionsButton.onClick.AddListener(ShowInstructionsScreen);
         quitButton.onClick.AddListener(Quit);
 
+        // connecting
+        ConnectToLobby(ConnectionCompleteAction.ShowMenuScreen);
+
         // instructions
-        instructionsCloseButton.onClick.AddListener(HideInstructions);
+        instructionsCloseButton.onClick.AddListener(HideInstructionsScreen);
 
         instructionsScreen.gameObject.SetActive(false);
         instructionsScreen.alpha = 0f;
@@ -65,17 +73,9 @@ public class MenuController : MonoBehaviour {
         lobbyScreen.gameObject.SetActive(false);
         lobbyScreen.alpha = 0f;
 
-        // connecting
-        if (!PhotonNetwork.IsConnectedAndReady) {
-
-            menuScreen.gameObject.SetActive(false); // make sure menu is disabled while connecting screen is active
-
-            connectingScreen.alpha = 1f; // reset alpha for fade
-            connectingScreen.gameObject.SetActive(true);
-
-            StartCoroutine(HandleConnection()); // fade out connecting screen when connected
-
-        }
+        // room
+        roomScreen.gameObject.SetActive(false);
+        roomScreen.alpha = 0f;
 
         // loading
         if (!menuManager.IsFirstLoadCompleted()) { // don't fade in loading screen on first load (connection occurs on first load, so the connecting screen is shown instead)
@@ -85,6 +85,19 @@ public class MenuController : MonoBehaviour {
 
             if (loadingScreenCoroutine != null) StopCoroutine(loadingScreenCoroutine); // stop any existing loading screen fade coroutines
             loadingScreenCoroutine = StartCoroutine(FadeLoadingScreen(0f, loadingScreenFadeDuration, LoadingCompleteAction.DisableLoadingScreen, true)); // fade out loading screen on first load
+
+        }
+
+        RefreshLayout(menuScreen.GetComponent<RectTransform>()); // refresh menu screen layout
+
+    }
+
+    public void ConnectToLobby(ConnectionCompleteAction action) {
+
+        if (!PhotonNetwork.IsConnectedAndReady) {
+
+            if (connectionCoroutine != null) return; // if already trying to connect, don't start another connection coroutine
+            connectionCoroutine = StartCoroutine(HandleConnection(action)); // fade out connecting screen when connected
 
         }
     }
@@ -168,7 +181,19 @@ public class MenuController : MonoBehaviour {
     }
     */
 
-    private void ShowInstructions() {
+    private void ShowMenuScreen() {
+
+        menuScreen.gameObject.SetActive(true);
+        menuScreen.alpha = 0f; // reset alpha for fade
+
+        if (menuFadeCoroutine != null) StopCoroutine(menuFadeCoroutine); // stop any existing menu fade coroutines
+        menuFadeCoroutine = StartCoroutine(FadeMenu(menuScreen, 1f, menuScreenFadeDuration)); // fade in menu
+
+        RefreshLayout(menuScreen.GetComponent<RectTransform>()); // refresh menu screen layout
+
+    }
+
+    private void ShowInstructionsScreen() {
 
         menuScreen.gameObject.SetActive(false);
         menuScreen.alpha = 0f; // reset alpha for fade
@@ -182,7 +207,7 @@ public class MenuController : MonoBehaviour {
 
     }
 
-    private void HideInstructions() {
+    private void HideInstructionsScreen() {
 
         instructionsScreen.gameObject.SetActive(false);
         instructionsScreen.alpha = 0f;
@@ -194,10 +219,14 @@ public class MenuController : MonoBehaviour {
 
     }
 
-    private void ShowLobbyScreen() {
+    public void ShowLobbyScreen() {
 
+        // hide both the menu and room screens because either one could potentially be active when showing the lobby screen, and we want to make sure both are hidden
         menuScreen.gameObject.SetActive(false);
         menuScreen.alpha = 0f; // reset alpha for fade
+
+        roomScreen.gameObject.SetActive(false);
+        roomScreen.alpha = 0f; // reset alpha for fade
 
         lobbyScreen.gameObject.SetActive(true);
 
@@ -217,6 +246,32 @@ public class MenuController : MonoBehaviour {
 
         if (menuFadeCoroutine != null) StopCoroutine(menuFadeCoroutine); // stop any existing menu fade coroutines
         menuFadeCoroutine = StartCoroutine(FadeMenu(menuScreen, 1f, menuScreenFadeDuration)); // fade in menu
+
+    }
+
+    public void ShowRoomScreen() {
+
+        lobbyScreen.gameObject.SetActive(false);
+        lobbyScreen.alpha = 0f; // reset alpha for fade
+
+        roomScreen.gameObject.SetActive(true);
+
+        if (menuFadeCoroutine != null) StopCoroutine(menuFadeCoroutine); // stop any existing menu fade coroutines
+        menuFadeCoroutine = StartCoroutine(FadeMenu(roomScreen, 1f, roomScreenFadeDuration)); // fade in room screen
+
+        RefreshLayout(roomScreen.GetComponent<RectTransform>()); // refresh room screen layout
+
+    }
+
+    private void HideRoomScreen() {
+
+        roomScreen.gameObject.SetActive(false);
+        roomScreen.alpha = 0f;
+
+        lobbyScreen.gameObject.SetActive(true);
+
+        if (menuFadeCoroutine != null) StopCoroutine(menuFadeCoroutine); // stop any existing menu fade coroutines
+        menuFadeCoroutine = StartCoroutine(FadeMenu(lobbyScreen, 1f, lobbyScreenFadeDuration)); // fade in lobby screen
 
     }
 
@@ -277,7 +332,13 @@ public class MenuController : MonoBehaviour {
 
     }
 
-    private IEnumerator HandleConnection() {
+    private IEnumerator HandleConnection(ConnectionCompleteAction action) {
+
+        menuScreen.gameObject.SetActive(false); // make sure menu is disabled while connecting screen is active
+        roomScreen.gameObject.SetActive(false); // make sure room screen is disabled while connecting screen is active
+
+        connectingScreen.alpha = 1f; // reset alpha for fade
+        connectingScreen.gameObject.SetActive(true);
 
         // wait until connected to lobby before fading out connecting screen and showing menu
         while (!PhotonNetwork.InLobby)
@@ -297,14 +358,19 @@ public class MenuController : MonoBehaviour {
         connectingScreen.alpha = 0f; // make sure the final opacity is set to 0
         connectingScreen.gameObject.SetActive(false);
 
-        menuScreen.alpha = 0f; // reset alpha for fade
-        menuScreen.gameObject.SetActive(true);
+        switch (action) {
 
-        if (menuFadeCoroutine != null) StopCoroutine(menuFadeCoroutine); // stop any existing menu fade coroutines
-        menuFadeCoroutine = StartCoroutine(FadeMenu(menuScreen, 1f, menuScreenFadeDuration)); // fade in menu
+            case ConnectionCompleteAction.ShowMenuScreen:
+                ShowMenuScreen();
+                break;
 
-        RefreshLayout(menuScreen.GetComponent<RectTransform>()); // refresh menu screen layout
-        RefreshLayout(menuButtonsLayout); // refresh menu buttons layout
+            case ConnectionCompleteAction.ShowLobbyScreen:
+                ShowLobbyScreen();
+                break;
+
+        }
+
+        connectionCoroutine = null; // reset the coroutine reference when done
 
     }
 
@@ -328,4 +394,11 @@ public class MenuController : MonoBehaviour {
         DisableLoadingScreen
 
     }
+}
+
+public enum ConnectionCompleteAction {
+
+    ShowMenuScreen,
+    ShowLobbyScreen
+
 }

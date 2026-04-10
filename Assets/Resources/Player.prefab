@@ -343,7 +343,8 @@ GameObject:
   - component: {fileID: 2990617790386288545}
   - component: {fileID: 2110754043814550119}
   - component: {fileID: 7221259402574283803}
-  - component: {fileID: 2687797722085696313}
+  - component: {fileID: 2446534543272928315}
+  - component: {fileID: -4270282822629830820}
   - component: {fileID: 7167040424334699498}
   m_Layer: 7
   m_Name: Player
@@ -608,7 +609,7 @@ MonoBehaviour:
   gunSlot: {fileID: 8770193713029372868}
   shootableMask:
     serializedVersion: 2
-    m_Bits: 2112
+    m_Bits: 2240
   reloadKey: 114
 --- !u!114 &6976460884296807589
 MonoBehaviour:
@@ -623,9 +624,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 100
+  deathEffect: {fileID: 8961104740163596906, guid: 4f35fb8934391ed46be3d10586c62f53, type: 3}
   regenAmount: 1
   regenWaitDuration: 1
-  deathEffect: {fileID: 8961104740163596906, guid: 4f35fb8934391ed46be3d10586c62f53, type: 3}
   respawnTime: 0
 --- !u!114 &2990617790386288545
 MonoBehaviour:
@@ -686,12 +687,13 @@ MonoBehaviour:
   OwnershipTransfer: 0
   observableSearch: 2
   ObservedComponents:
-  - {fileID: 2687797722085696313}
+  - {fileID: 2446534543272928315}
+  - {fileID: -4270282822629830820}
   - {fileID: 7167040424334699498}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
---- !u!114 &2687797722085696313
+--- !u!114 &2446534543272928315
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -700,30 +702,29 @@ MonoBehaviour:
   m_GameObject: {fileID: 8501975935789803537}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8efc6b1d64977384eb3405357896c656, type: 3}
+  m_Script: {fileID: 11500000, guid: 627855c7f81362d41938ffe0b1475957, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.PhotonTransformViewClassic
-  m_PositionModel:
-    SynchronizeEnabled: 1
-    TeleportEnabled: 1
-    TeleportIfDistanceGreaterThan: 3
-    InterpolateOption: 2
-    InterpolateMoveTowardsSpeed: 1
-    InterpolateLerpSpeed: 1
-    ExtrapolateOption: 0
-    ExtrapolateSpeed: 1
-    ExtrapolateIncludingRoundTripTime: 1
-    ExtrapolateNumberOfStoredPositions: 1
-  m_RotationModel:
-    SynchronizeEnabled: 1
-    InterpolateOption: 0
-    InterpolateRotateTowardsSpeed: 180
-    InterpolateLerpSpeed: 5
-  m_ScaleModel:
-    SynchronizeEnabled: 0
-    InterpolateOption: 0
-    InterpolateMoveTowardsSpeed: 1
-    InterpolateLerpSpeed: 0
+  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.PhotonTransformView
+  m_SynchronizePosition: 1
+  m_SynchronizeRotation: 1
+  m_SynchronizeScale: 0
+  m_UseLocal: 1
+--- !u!114 &-4270282822629830820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8501975935789803537}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e7cb724808c322458aa4d15f5035fa9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.PhotonRigidbody2DView
+  m_SynchronizeVelocity: 1
+  m_SynchronizeAngularVelocity: 0
+  m_TeleportEnabled: 0
+  m_TeleportIfDistanceGreaterThan: 3
 --- !u!114 &7167040424334699498
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -927,6 +928,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 8770193713029372868}
     m_Modifications:
+    - target: {fileID: -491451369754966818, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: ObservedComponents.Array.size
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1514478377899827542, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -965,6 +970,46 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1514478377899827542, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1531451717894999157, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeLayers.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1531451717894999157, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeParameters.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3390143977945679289, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeLayers.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3390143977945679289, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeParameters.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5248209626831353100, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeLayers.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5248209626831353100, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeParameters.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6196381101761546344, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeLayers.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6196381101761546344, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: m_SynchronizeParameters.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6935305745599525864, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: ObservedComponents.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6994265928413307560, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: ObservedComponents.Array.size
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7147479033992212892, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}

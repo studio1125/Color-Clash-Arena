@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Photon.Pun;
 
 [RequireComponent(typeof(PlayerController))]
-public class PlayerClaimManager : MonoBehaviour {
+public class PlayerClaimManager : MonoBehaviourPun {
 
     [Header("References")]
     private GameCore gameCore;
@@ -32,6 +33,8 @@ public class PlayerClaimManager : MonoBehaviour {
 
     private void Update() {
 
+        if (!photonView.IsMine) return; // only local player claims tiles they stand on
+
         if (playerController.IsMechanicEnabled(MechanicType.Claiming)) { // don't return if false to allow for more code to be added to this method later
 
             // if player is standing on something, claim it
@@ -60,6 +63,6 @@ public class PlayerClaimManager : MonoBehaviour {
 
     }
 
-    public Dictionary<Color, int> GetClaims() { return claims; }
+    public Dictionary<Color, int> GetClaims() => claims;
 
 }

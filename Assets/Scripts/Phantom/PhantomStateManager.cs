@@ -1,13 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Photon.Pun;
+using static UnityEngine.GraphicsBuffer;
+
 
 #if UNITY_EDITOR
 using UnityEditor.SceneManagement; // import only in editor
 #endif
 
 [RequireComponent(typeof(PhantomController))]
-public class PhantomStateManager : MonoBehaviour {
+public class PhantomStateManager : MonoBehaviourPun {
 
     [Header("References")]
     private GameCore gameCore;
@@ -16,7 +19,7 @@ public class PhantomStateManager : MonoBehaviour {
     private PhantomHealthManager healthManager;
     private Rigidbody2D rb;
     private Animator animator;
-    private Transform player;
+    private Transform currentTarget;
     private bool initialized;
 
     [Header("Movement")]
@@ -46,6 +49,8 @@ public class PhantomStateManager : MonoBehaviour {
     [SerializeField][Tooltip("Shot delay when player enters vision in front of enemy")] private float frontShotDelay;
     [SerializeField][Tooltip("Shot delay when player enters vision behind enemy")] private float behindShotDelay;
 
+    // called on all clients via PhantomController.OnPhotonInstantiate to set isFlipped and mark initialized
+    // patrol points are null on non-master clients since only MasterClient needs them for AI
     public void Initialize(Transform[] patrolPoints, bool isFlipped) {
 
         this.patrolPoints = patrolPoints;
@@ -62,7 +67,6 @@ public class PhantomStateManager : MonoBehaviour {
         healthManager = GetComponent<PhantomHealthManager>();
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
-        player = FindFirstObjectByType<PlayerController>().transform;
 
         // vision
         visionCollider = visionObj.AddComponent<BoxCollider2D>();
@@ -81,17 +85,22 @@ public class PhantomStateManager : MonoBehaviour {
         // states
         phantomState = PhantomState.Patrol; // default state is patrol
 
-        // patrolling
-        if (patrolPoints.Length > 1) {
+        // only MasterClient runs AI coroutines; it broadcasts results via IPunObservable or RPCs
+        if (PhotonNetwork.IsMasterClient) {
 
-            currPointIndex = 1;
-            animator.SetBool("isRunning", true);
-            StartCoroutine(Patrol());
+            // patrolling; patrolPoints is only set on MasterClient so guard here
+            if (patrolPoints != null && patrolPoints.Length > 1) {
+
+                currPointIndex = 1;
+                animator.SetBool("isRunning", true);
+                StartCoroutine(Patrol());
+
+            }
+
+            // attacking
+            StartCoroutine(Attack());
 
         }
-
-        // attacking
-        StartCoroutine(Attack());
 
         // reallign canvas with phantom if flipped
         if (isFlipped)
@@ -100,6 +109,9 @@ public class PhantomStateManager : MonoBehaviour {
     }
 
     private void Update() {
+
+        // only MasterClient updates AI state; non-master clients just render
+        if (!PhotonNetwork.IsMasterClient) return;
 
         lastPhantomState = phantomState;
 
@@ -112,22 +124,17 @@ public class PhantomStateManager : MonoBehaviour {
 
     private void OnTriggerEnter2D(Collider2D collision) {
 
-        //if (collision.transform.CompareTag("Player")) { // collider is player
+        if (!PhotonNetwork.IsMasterClient) return; // only MasterClient processes vision triggers
 
-        //    playerInVision = true;
+        if (collision.CompareTag("Player")) { // collider is player
 
-        //    // play danger animation
-        //    dangerIcon.SetActive(true);
-        //    animator.SetBool("playerInVision", true);
-
-        //}
-
-        if (collision.transform.CompareTag("Player")) { // collider is player
+            Transform target = collision.transform;
 
             RaycastHit2D obstacleHit = Physics2D.Raycast(visionObj.transform.position, visionObj.transform.right, frontVisionRange, gameCore.GetEnvironmentMask()); // for checking if an obstacle is in the way
 
-            if (!obstacleHit || Vector2.Distance(visionObj.transform.position, obstacleHit.point) > Vector2.Distance(visionObj.transform.position, player.position)) { // obstacle is not in the way
+            if (!obstacleHit || Vector2.Distance(visionObj.transform.position, obstacleHit.point) > Vector2.Distance(visionObj.transform.position, target.position)) { // obstacle is not in the way
 
+                currentTarget = target;
                 playerInVision = true;
 
                 // play danger animation
@@ -140,12 +147,17 @@ public class PhantomStateManager : MonoBehaviour {
 
     private void OnTriggerStay2D(Collider2D collision) {
 
+        if (!PhotonNetwork.IsMasterClient) return; // only MasterClient processes vision triggers
+
         if (collision.transform.CompareTag("Player")) { // collider is player
+
+            Transform target = collision.transform;
 
             RaycastHit2D obstacleHit = Physics2D.Raycast(visionObj.transform.position, visionObj.transform.right, frontVisionRange, gameCore.GetEnvironmentMask()); // for checking if an obstacle is in the way
 
-            if (!obstacleHit || Vector2.Distance(visionObj.transform.position, obstacleHit.point) > Vector2.Distance(visionObj.transform.position, player.position)) { // obstacle is not in the way
+            if (!obstacleHit || Vector2.Distance(visionObj.transform.position, obstacleHit.point) > Vector2.Distance(visionObj.transform.position, target.position)) { // obstacle is not in the way
 
+                currentTarget = target;
                 playerInVision = true;
 
                 // play danger animation
@@ -158,13 +170,16 @@ public class PhantomStateManager : MonoBehaviour {
 
     private void OnTriggerExit2D(Collider2D collision) {
 
-        if (collision.transform.CompareTag("Player")) { // collider is player
+        if (!PhotonNetwork.IsMasterClient) return; // only MasterClient processes vision triggers
+
+        if (collision.transform.CompareTag("Player") && collision.transform == currentTarget) { // collider is player and is the current target (prevents phantom from losing player if they exit vision but aren't the current target, which can happen if multiple players are in vision)
 
             // stop danger animation
             animator.SetBool("playerInVision", false);
             dangerIcon.SetActive(false);
 
             playerInVision = false;
+            currentTarget = null; // reset target
 
         }
     }
@@ -210,9 +225,16 @@ public class PhantomStateManager : MonoBehaviour {
 
             if (phantomState == PhantomState.Attack) {
 
+                if (currentTarget == null) {
+
+                    yield return null;
+                    continue;
+
+                }
+
                 // phantom should look at player before shooting
-                if ((transform.position.x > player.position.x && phantomController.IsFacingRight()) // phantom is to the right of player
-                    || (transform.position.x <= player.position.x && !phantomController.IsFacingRight())) { // phantom is to the left of player
+                if ((transform.position.x > currentTarget.position.x && phantomController.IsFacingRight()) // phantom is to the right of the current target
+                    || (transform.position.x <= currentTarget.position.x && !phantomController.IsFacingRight())) { // phantom is to the left of the current target
 
                     phantomController.Flip(); // flip phantom
 
@@ -244,8 +266,8 @@ public class PhantomStateManager : MonoBehaviour {
                     animator.SetBool("isRunning", false); // stop run animation
 
                     // make sure phantom is still looking at player after delay
-                    if ((transform.position.x > player.position.x && phantomController.IsFacingRight()) // phantom is to the right of player
-                        || (transform.position.x <= player.position.x && !phantomController.IsFacingRight())) // phantom is to the left of player
+                    if ((transform.position.x > currentTarget.position.x && phantomController.IsFacingRight()) // phantom is to the right of the current target
+                        || (transform.position.x <= currentTarget.position.x && !phantomController.IsFacingRight())) // phantom is to the left of the current target
                         phantomController.Flip(); // flip phantom
 
                     rb.linearVelocity = Vector2.zero; // stop movement

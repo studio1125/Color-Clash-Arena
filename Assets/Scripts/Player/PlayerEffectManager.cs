@@ -1,10 +1,9 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Photon.Pun;
 
 [RequireComponent(typeof(PlayerController))]
-public class PlayerEffectManager : MonoBehaviour {
+public class PlayerEffectManager : MonoBehaviourPun {
 
     [Header("References")]
     private UIController uiController;
@@ -14,7 +13,9 @@ public class PlayerEffectManager : MonoBehaviour {
 
     private void Start() {
 
-        uiController = FindFirstObjectByType<UIController>();
+        // only get UI for the local player
+        if (photonView.IsMine)
+            uiController = FindFirstObjectByType<UIController>();
 
     }
 
@@ -35,7 +36,11 @@ public class PlayerEffectManager : MonoBehaviour {
             if (effectData.GetEffectType() == effectType) {
 
                 effectData.AddEffectMultiplier(multiplier);
-                uiController.UpdateClaimablesHUD(); // update ui
+
+                // update ui for local player only
+                if (photonView.IsMine) // this should be true, but it's good practice to check before accessing the UI
+                    uiController.UpdateClaimablesHUD();
+
                 return;
 
             }
@@ -49,13 +54,17 @@ public class PlayerEffectManager : MonoBehaviour {
             if (effectData.GetEffectType() == effectType) {
 
                 effectData.RemoveEffectMultiplier(multiplier);
-                uiController.UpdateClaimablesHUD(); // update ui
+
+                // update ui for local player only
+                if (photonView.IsMine)
+                    uiController.UpdateClaimablesHUD();
+
                 return;
 
             }
         }
     }
 
-    public List<EffectData> GetEffectMultipliers() { return effectMultipliers; }
+    public List<EffectData> GetEffectMultipliers() => effectMultipliers;
 
 }

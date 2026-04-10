@@ -1,8 +1,8 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Photon.Pun;
 
-public class PlayerInteractManager : MonoBehaviour {
+public class PlayerInteractManager : MonoBehaviourPun {
 
     [Header("Interacting")]
     [SerializeField] private float interactRadius;
@@ -13,13 +13,11 @@ public class PlayerInteractManager : MonoBehaviour {
     [Header("Keybinds")]
     [SerializeField] private KeyCode interactKey;
 
-    private void Start() {
-
-        detectedInteractables = new List<Interactable>();
-
-    }
+    private void Start() => detectedInteractables = new List<Interactable>();
 
     private void Update() {
+
+        if (!photonView.IsMine) return; // only the local player can interact with things
 
         Interactable interactable = Physics2D.OverlapCircle(transform.position, interactRadius, interactableMask)?.GetComponent<Interactable>(); // get interactable
 

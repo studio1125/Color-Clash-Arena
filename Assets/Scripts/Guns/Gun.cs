@@ -1,5 +1,5 @@
+using Photon.Pun;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Gun : MonoBehaviour {
@@ -7,14 +7,13 @@ public class Gun : MonoBehaviour {
     [Header("References")]
     [SerializeField] private GunData gunData;
     private GameCore gameCore;
-    private PlayerController playerController;
     private LevelAudioManager audioManager;
     private Animator animator;
     private UIController uiController;
 
     [Header("Shooting")]
     [SerializeField] private Transform muzzle;
-    [SerializeField] private Bullet bullet;
+    [SerializeField] private Bullet bulletPrefab; // must be inside the Resources/ folder
     private EntityType entityType;
     private LayerMask shootableMask;
     private int gunIndex;
@@ -25,24 +24,26 @@ public class Gun : MonoBehaviour {
     [Header("Tracer")]
     [SerializeField] private LineRenderer bulletTracer;
     [SerializeField] private float bulletTracerDisplayDuration;
+    private Coroutine tracerCoroutine; // stored so rapid fire doesn't stack coroutines and cause flashing
 
     [Header("Impact")]
     [SerializeField] private GameObject impactEffect;
     private new Collider2D collider;
 
     /*
-    IMPORTANT:
-        - IMPORTANT: RELOAD ANIMATION MUST BE 1 SECOND LONG FOR SCALING TO WORK
+    IMPORTANT: RELOAD ANIMATION MUST BE 1 SECOND LONG FOR SCALING TO WORK
     */
 
     // start function
     public void Initialize(EntityType entityType, LayerMask shootableMask, Collider2D collider, int gunIndex) {
 
         gameCore = FindFirstObjectByType<GameCore>();
-        playerController = FindFirstObjectByType<PlayerController>();
         audioManager = FindFirstObjectByType<LevelAudioManager>();
         animator = GetComponent<Animator>();
-        uiController = FindFirstObjectByType<UIController>();
+
+        // only get UI reference for player guns (phantoms don't need UI)
+        if (entityType == EntityType.Player)
+            uiController = FindFirstObjectByType<UIController>();
 
         this.entityType = entityType;
         this.shootableMask = shootableMask;
@@ -54,14 +55,18 @@ public class Gun : MonoBehaviour {
 
     }
 
-    public IEnumerator Shoot(float multiplier = 1f) {
+    // returns the tracer end point if this is a raycast gun so PlayerGunManager can RPC it to other clients, or null if no tracer should be shown
+    // onTracerFired: called when a raycast shot fires so PlayerGunManager can RPC the tracer to other clients
+    // onReloadStarted: called when auto-reload triggers on empty so PlayerGunManager can RPC the animation to other clients
+    public IEnumerator Shoot(float multiplier = 1f, System.Action<Vector2, Vector2> onTracerFired = null, System.Action onReloadStarted = null) {
 
         if (isReloading || !shotReady) yield break; // don't check if ammo is greater than 0 because reload is handled after this
 
         // reload if out of ammo
         if (currAmmo == 0) {
 
-            StartCoroutine(Reload());
+            StartReload();
+            onReloadStarted?.Invoke(); // notify PlayerGunManager so it can RPC the animation to other clients
             yield break;
 
         }
@@ -76,49 +81,43 @@ public class Gun : MonoBehaviour {
             RaycastHit2D shootableHit = Physics2D.Raycast(muzzle.position, muzzle.right, gunData.GetMaxRange(), shootableMask); // for checking if a shootable is hit
             RaycastHit2D obstacleHit = Physics2D.Raycast(muzzle.position, muzzle.right, gunData.GetMaxRange(), gameCore.GetEnvironmentMask()); // for checking if an obstacle is in the way
 
+            Vector2 tracerStart = muzzle.position;
+            Vector2 tracerEnd;
+
             if (obstacleHit && (Vector2.Distance(muzzle.position, obstacleHit.point) <= Vector2.Distance(muzzle.position, shootableHit.point) || !shootableHit)) { // obstacle in the way or shot didn't hit shootable, but hit obstacle
 
                 // impact effect
                 Instantiate(impactEffect, obstacleHit.point, Quaternion.identity);
-
-                // set bullet tracer points
-                bulletTracer.SetPosition(0, muzzle.position);
-                bulletTracer.SetPosition(1, obstacleHit.point);
+                tracerEnd = obstacleHit.point;
 
             } else if (shootableHit) {
 
-                bool? deathCaused = false; // to prevent impact effect when something dies (for better looking gfx)
+                // route damage through RequestTakeDamage so it goes via the correct RPC target
+                // (player damage -> photonView.Owner, phantom damage -> MasterClient)
+                if (shootableHit.transform.TryGetComponent(out PlayerHealthManager playerHealth))
+                    playerHealth.RequestTakeDamage(gunData.GetDamage() * multiplier);
+                else if (shootableHit.transform.TryGetComponent(out PhantomHealthManager phantomHealth))
+                    phantomHealth.RequestTakeDamage(gunData.GetDamage() * multiplier);
 
-                if (entityType == EntityType.Player)
-                    deathCaused = shootableHit.transform.GetComponent<PhantomHealthManager>()?.TakeDamage(gunData.GetDamage() * multiplier); // damage enemy if player is shooter
-                else if (entityType == EntityType.Phantom)
-                    deathCaused = shootableHit.transform.GetComponent<PlayerHealthManager>()?.TakeDamage(gunData.GetDamage() * multiplier);  // damage player if enemy is shooter
-
-                // impact effect
-                if (deathCaused != null && !(bool) deathCaused)
-                    Instantiate(impactEffect, shootableHit.point, Quaternion.identity);
-
-                // set bullet tracer points
-                bulletTracer.SetPosition(0, muzzle.position);
-                bulletTracer.SetPosition(1, shootableHit.point);
+                // impact effect (always show since we can't know death outcome across the network)
+                Instantiate(impactEffect, shootableHit.point, Quaternion.identity);
+                tracerEnd = shootableHit.point;
 
             } else { // miss
 
-                // set bullet tracer points
-                bulletTracer.SetPosition(0, muzzle.position);
-                bulletTracer.SetPosition(1, muzzle.position + muzzle.right * gunData.GetMaxRange());
-                // bulletTracer.SetPosition(1, muzzle.position + muzzle.right * 100f); // illusion for infinite length tracer when missed
+                tracerEnd = (Vector2) muzzle.position + (Vector2) muzzle.right * gunData.GetMaxRange();
+                // tracerEnd = (Vector2) muzzle.position + (Vector2) muzzle.right * 100f; // illusion for infinite length tracer when missed
 
             }
 
-            // display bullet tracer
-            bulletTracer.enabled = true;
-            yield return new WaitForSeconds(bulletTracerDisplayDuration);
-            bulletTracer.enabled = false;
+            ShowTracer(tracerStart, tracerEnd); // show tracer locally
+            onTracerFired?.Invoke(tracerStart, tracerEnd); // notify PlayerGunManager of the endpoints so it can RPC them to other clients
 
         } else {
 
-            Instantiate(bullet, muzzle.position, muzzle.rotation).Initialize(entityType, gunData.GetDamage() * multiplier, muzzle.position, gunData.GetMaxRange(), collider); // instantiate bullet
+            // use PhotonNetwork.Instantiate so the bullet is visible on all clients
+            Bullet bullet = PhotonNetwork.Instantiate(bulletPrefab.name, muzzle.position, muzzle.rotation).GetComponent<Bullet>();
+            bullet.Initialize(gunData.GetDamage() * multiplier, muzzle.position, gunData.GetMaxRange(), collider); // initialize bullet
 
         }
 
@@ -129,17 +128,55 @@ public class Gun : MonoBehaviour {
 
     }
 
-    private bool CanReload() {
+    // shows the tracer on this client (called both locally after shooting and on remote clients via RPC)
+    public void ShowTracer(Vector2 start, Vector2 end) {
 
-        return currAmmo < gunData.GetMagazineSize() && !isReloading;
+        bulletTracer.SetPosition(0, start);
+        bulletTracer.SetPosition(1, end);
+
+        // stop any existing tracer coroutine before starting a new one to prevent rapid-fire flashing
+        if (tracerCoroutine != null)
+            StopCoroutine(tracerCoroutine);
+
+        tracerCoroutine = StartCoroutine(DisplayTracer());
 
     }
 
-    public IEnumerator Reload() {
+    private IEnumerator DisplayTracer() {
+
+        bulletTracer.enabled = true;
+        yield return new WaitForSeconds(bulletTracerDisplayDuration);
+        bulletTracer.enabled = false;
+        tracerCoroutine = null;
+
+    }
+
+    private bool CanReload() => currAmmo < gunData.GetMagazineSize() && !isReloading;
+
+    public void StartReload() => StartCoroutine(Reload());
+
+    private IEnumerator Reload() {
 
         if (!CanReload()) yield break;
 
         isReloading = true;
+
+        // play the visual part of the reload on this client
+        yield return StartCoroutine(PlayReloadAnimation());
+
+        currAmmo = GetMagazineSize(); // reload gun
+
+        if (entityType == EntityType.Player) // only update UI for player guns
+            uiController.UpdateGunHUD(this, gunIndex); // update ui
+
+        isReloading = false;
+        shotReady = true; // reset fire rate cooldown
+
+    }
+
+    // plays only the visual part of the reload (sound + animation); no ammo or UI changes
+    // called on remote clients via RPC so the animation shows without affecting their local state
+    public IEnumerator PlayReloadAnimation() {
 
         if (gunData.GetReloadSound() != null)
             audioManager.PlaySound(gunData.GetReloadSound()); // play reload sound
@@ -150,13 +187,7 @@ public class Gun : MonoBehaviour {
 
         yield return new WaitForEndOfFrame(); // wait for end of frame so animation starts playing
         animator.speed = 1f / gunData.GetReloadTime(); // scale animation speed by reload time
-        yield return new WaitForSeconds(gunData.GetReloadTime()); // wait for reload time
-        currAmmo = GetMagazineSize(); // reload gun
-
-        uiController.UpdateGunHUD(this, gunIndex); // update ui
-
-        isReloading = false;
-        shotReady = true; // reset fire rate cooldown
+        yield return new WaitForSeconds(gunData.GetReloadTime()); // wait for reload duration
 
     }
 
@@ -171,12 +202,14 @@ public class Gun : MonoBehaviour {
 
     }
 
-    public Sprite GetIcon() { return gunData.GetIcon(); }
+    public Sprite GetIcon() => gunData.GetIcon();
 
-    public int GetCurrentAmmo() { return currAmmo; }
+    public bool IsAutomatic() => gunData.IsAutomatic();
 
-    public int GetMagazineSize() { return gunData.GetMagazineSize(); }
+    public int GetCurrentAmmo() => currAmmo;
 
-    public bool IsReloading() { return isReloading; }
+    public int GetMagazineSize() => gunData.GetMagazineSize();
+
+    public bool IsReloading() => isReloading;
 
 }

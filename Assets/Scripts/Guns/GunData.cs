@@ -1,15 +1,13 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 [CreateAssetMenu]
 public class GunData : ScriptableObject {
 
+    [Header("Data")]
     [SerializeField] private new string name;
     [SerializeField] private Sprite icon;
     [SerializeField] private float damage;
+    [SerializeField] private bool isAutomatic;
     [SerializeField] private int magazineSize;
     [SerializeField] private float fireRate;
     [SerializeField] private float maxRange;
@@ -18,24 +16,26 @@ public class GunData : ScriptableObject {
     [SerializeField] private AudioClip shootSound;
     [SerializeField] private AudioClip reloadSound;
 
-    public string GetName() { return name; }
+    public string GetName() => name;
 
-    public Sprite GetIcon() { return icon; }
+    public Sprite GetIcon() => icon;
 
-    public float GetDamage() { return damage; }
+    public float GetDamage() => damage;
 
-    public int GetMagazineSize() { return magazineSize; }
+    public bool IsAutomatic() => isAutomatic;
 
-    public float GetFireRate() { return fireRate; }
+    public int GetMagazineSize() => magazineSize;
 
-    public float GetMaxRange() { return maxRange; }
+    public float GetFireRate() => fireRate;
 
-    public float GetReloadTime() { return reloadTime; }
+    public float GetMaxRange() => maxRange;
 
-    public bool UsesRaycastShooting() { return useRaycastShooting; }
+    public float GetReloadTime() => reloadTime;
 
-    public AudioClip GetShootSound() { return shootSound; }
+    public bool UsesRaycastShooting() => useRaycastShooting;
 
-    public AudioClip GetReloadSound() { return reloadSound; }
+    public AudioClip GetShootSound() => shootSound;
+
+    public AudioClip GetReloadSound() => reloadSound;
 
 }

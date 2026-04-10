@@ -4,17 +4,17 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Photon.Pun;
 
 [RequireComponent(typeof(PhantomController))]
-public class PhantomHealthManager : MonoBehaviour {
+public class PhantomHealthManager : HealthManager, IPunObservable {
 
     [Header("References")]
     private PhantomController phantomController;
     private GameManager gameManager;
     private SpriteRenderer spriteRenderer;
 
-    [Header("Health")]
-    [SerializeField] private int maxHealth;
+    [Header("Health Bar")]
     [SerializeField] private Transform healthCanvas;
     [SerializeField] private Slider healthSlider;
     [SerializeField] private Image sliderFill;
@@ -22,27 +22,49 @@ public class PhantomHealthManager : MonoBehaviour {
     [SerializeField] private float healthLerpDuration;
     [SerializeField] private Gradient healthGradient;
     private Coroutine healthLerpCoroutine;
-    private float health;
 
-    [Header("Death")]
-    [SerializeField] private ParticleSystem deathEffect;
+    private new void Start() {
 
-    private void Start() {
+        base.Start(); // sets health and calls UpdateHealth
 
         phantomController = GetComponent<PhantomController>();
         gameManager = FindFirstObjectByType<GameManager>();
         spriteRenderer = GetComponent<SpriteRenderer>();
 
-        // set health & health slider values
-        health = maxHealth;
-        healthSlider.maxValue = health;
+        // sync slider max with maxHealth set in base
+        healthSlider.maxValue = maxHealth;
         healthSlider.value = healthSlider.maxValue;
         healthText.text = Mathf.CeilToInt(healthSlider.value) + ""; // health text is health rounded up
 
     }
 
-    // returns if phantom dies
-    public bool TakeDamage(float damage) {
+    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info) {
+
+        if (stream.IsWriting) {
+
+            // master client: send the current health value
+            stream.SendNext(health);
+
+        } else {
+
+            // clients: receive the health value
+            float networkHealth = (float) stream.ReceiveNext();
+
+            // if the received health is different, update visuals
+            if (networkHealth != health) {
+
+                health = networkHealth;
+                UpdateHealth(health);
+
+            }
+        }
+    }
+
+    // routes damage to MasterClient who owns all phantom logic; use this instead of TakeDamage directly
+    public override void RequestTakeDamage(float damage) => SendDamageToMasterClient(damage);
+
+    // only called on MasterClient via RPC_TakeDamageMaster in the base class
+    public override bool TakeDamage(float damage) {
 
         RemoveHealth(damage);
 
@@ -60,7 +82,15 @@ public class PhantomHealthManager : MonoBehaviour {
 
     private void Die() {
 
-        Destroy(gameObject);
+        isDead = true;
+        photonView.RPC(nameof(RPC_Die), RpcTarget.All); // sync death across all clients before destroying
+
+    }
+
+    // RPC: runs on all clients to play death effect and destroy phantom
+    [PunRPC]
+    private void RPC_Die() {
+
         ParticleSystem.MainModule pm = Instantiate(deathEffect, transform.position, Quaternion.identity).main;
         pm.startColor = spriteRenderer.color; // change particle color based on phantom color
 
@@ -70,11 +100,15 @@ public class PhantomHealthManager : MonoBehaviour {
         foreach (PhantomClaim claim in phantomClaims.ToList()) // use ToList() to avoid InvalidOperationException
             Destroy(claim);
 
-        phantomController.GetEnemySpawn().OnEnemyDeath(); // tell phantom spawn to respawn phantom if enabled
+        // only MasterClient notifies the spawn about the death (to avoid double-respawn calls)
+        if (PhotonNetwork.IsMasterClient)
+            phantomController.GetEnemySpawn().OnEnemyDeath(); // tell phantom spawn to respawn phantom if enabled
+
+        Destroy(gameObject);
 
     }
 
-    public void UpdateHealth(float health) {
+    public override void UpdateHealth(float health) {
 
         if (healthLerpCoroutine != null)
             StopCoroutine(healthLerpCoroutine);
@@ -100,27 +134,6 @@ public class PhantomHealthManager : MonoBehaviour {
 
         healthSlider.value = targetHealth;
         healthLerpCoroutine = null;
-
-    }
-
-    private void SetHealth(float health) {
-
-        this.health = health;
-        UpdateHealth(this.health);
-
-    }
-
-    private void AddHealth(float health) {
-
-        this.health += health;
-        UpdateHealth(this.health);
-
-    }
-
-    private void RemoveHealth(float health) {
-
-        this.health -= health;
-        UpdateHealth(this.health);
 
     }
 

@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
@@ -11,14 +9,14 @@ public class EffectData {
     [SerializeField] private float effectMultiplier;
     [SerializeField] private Sprite effectIcon;
 
-    public EffectType GetEffectType() { return effectType; }
+    public EffectType GetEffectType() => effectType;
 
-    public float GetEffectMultiplier() { return effectMultiplier; }
+    public float GetEffectMultiplier() => effectMultiplier;
 
-    public void AddEffectMultiplier(float multiplier) { effectMultiplier += multiplier; }
+    public void AddEffectMultiplier(float multiplier) => effectMultiplier += multiplier;
 
-    public void RemoveEffectMultiplier(float multiplier) { effectMultiplier -= multiplier; }
+    public void RemoveEffectMultiplier(float multiplier) => effectMultiplier -= multiplier;
 
-    public Sprite GetEffectIcon() { return effectIcon; }
+    public Sprite GetEffectIcon() => effectIcon;
 
 }
