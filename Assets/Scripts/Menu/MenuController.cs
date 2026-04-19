@@ -1,6 +1,7 @@
 using Photon.Pun;
 using System.Collections;
 using TMPro;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -34,6 +35,13 @@ public class MenuController : MonoBehaviour {
     [SerializeField] private CanvasGroup lobbyScreen;
     [SerializeField] private float lobbyScreenFadeDuration;
     [SerializeField] private Button lobbyScreenCloseButton;
+
+    [Header("Errors")]
+    [SerializeField] private CanvasGroup errorScreen;
+    [SerializeField] private float errorScreenFadeDuration;
+    [SerializeField] private float errorDisplayDuration;
+    [SerializeField] private TMP_Text errorText;
+    private Coroutine errorCoroutine;
 
     [Header("Room")]
     [SerializeField] private CanvasGroup roomScreen;
@@ -72,6 +80,10 @@ public class MenuController : MonoBehaviour {
 
         lobbyScreen.gameObject.SetActive(false);
         lobbyScreen.alpha = 0f;
+
+        // errors
+        errorScreen.gameObject.SetActive(false);
+        errorScreen.alpha = 0f;
 
         // room
         roomScreen.gameObject.SetActive(false);
@@ -246,6 +258,54 @@ public class MenuController : MonoBehaviour {
 
         if (menuFadeCoroutine != null) StopCoroutine(menuFadeCoroutine); // stop any existing menu fade coroutines
         menuFadeCoroutine = StartCoroutine(FadeMenu(menuScreen, 1f, menuScreenFadeDuration)); // fade in menu
+
+    }
+
+    public void DisplayError(string errorMessage) {
+
+        errorText.text = errorMessage;
+
+        errorScreen.alpha = 0f; // reset alpha for fade
+        errorScreen.gameObject.SetActive(true);
+
+        if (errorCoroutine != null) StopCoroutine(errorCoroutine); // stop any existing error display coroutines
+        errorCoroutine = StartCoroutine(HandleErrorDisplay()); // start coroutine to handle error display timing and fading
+
+        RefreshLayout(errorScreen.GetComponent<RectTransform>()); // refresh error screen layout
+
+    }
+
+    private IEnumerator HandleErrorDisplay() {
+
+        float currentTime = 0f;
+        float startOpacity = errorScreen.alpha;
+
+        while (currentTime < errorScreenFadeDuration) {
+
+            currentTime += Time.deltaTime;
+            errorScreen.alpha = Mathf.Lerp(startOpacity, 1f, currentTime / errorScreenFadeDuration);
+            yield return null;
+
+        }
+
+        errorScreen.alpha = 1f; // make sure the final opacity is set to 1
+
+        yield return new WaitForSeconds(errorDisplayDuration); // wait for the error display duration
+
+        currentTime = 0f;
+
+        while (currentTime < errorScreenFadeDuration) {
+
+            currentTime += Time.deltaTime;
+            errorScreen.alpha = Mathf.Lerp(1f, 0f, currentTime / errorScreenFadeDuration);
+            yield return null;
+
+        }
+
+        errorScreen.alpha = 0f; // make sure the final opacity is set to 0
+        errorScreen.gameObject.SetActive(false);
+
+        errorCoroutine = null; // reset the coroutine reference when done
 
     }
 

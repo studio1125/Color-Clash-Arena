@@ -1,11 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class GravityFlipper : MonoBehaviour {
 
     [Header("References")]
-    private PlayerController playerController;
     private GameCore gameCore;
 
     [Header("Rotation")]
@@ -15,9 +12,7 @@ public class GravityFlipper : MonoBehaviour {
 
     private void Start() {
 
-        playerController = FindFirstObjectByType<PlayerController>();
         gameCore = FindFirstObjectByType<GameCore>();
-
         canRotate = true;
 
     }
@@ -25,15 +20,15 @@ public class GravityFlipper : MonoBehaviour {
     private void OnCollisionEnter2D(Collision2D collision) {
 
         if (collision.transform.CompareTag("Player"))
-            Flip();
+            Flip(collision.transform.GetComponent<PlayerController>());
 
     }
 
-    private void Flip() {
+    private void Flip(PlayerController playerController) {
 
         if (!canRotate) return;
 
-        gameCore.FlipGravity();
+        gameCore.ModifyGravity(-1f);
         playerController.GravityFlip(rotationDuration);
         canRotate = false;
 
@@ -41,9 +36,6 @@ public class GravityFlipper : MonoBehaviour {
 
     }
 
-    private void ResetRotateCooldown() {
+    private void ResetRotateCooldown() => canRotate = true;
 
-        canRotate = true;
-
-    }
 }

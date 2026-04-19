@@ -79,15 +79,13 @@ public class GameCore : MonoBehaviour {
     }
 
     // handle gravity here because it is constant throughout scenes
-    public void ModifyGravity(float gravityModifier) { Physics2D.gravity = new Vector2(Physics2D.gravity.x, Physics2D.gravity.y * gravityModifier); }
+    public void ModifyGravity(float gravityModifier) => Physics2D.gravity = new Vector2(Physics2D.gravity.x, Physics2D.gravity.y * gravityModifier);
 
-    public void FlipGravity() { Physics2D.gravity = new Vector2(Physics2D.gravity.x, -Physics2D.gravity.y); }
+    public void ResetGravity() => Physics2D.gravity = startGravity;
 
-    public void ResetGravity() { Physics2D.gravity = startGravity; }
+    public bool IsQuitting() => isQuitting;
 
-    public bool IsQuitting() { return isQuitting; }
-
-    public bool IsPaused() { return isPaused; }
+    public bool IsPaused() => isPaused;
 
     public void PauseGame() {
 
@@ -107,6 +105,6 @@ public class GameCore : MonoBehaviour {
 
     }
 
-    public LayerMask GetEnvironmentMask() { return environmentMask; }
+    public LayerMask GetEnvironmentMask() => environmentMask;
 
 }

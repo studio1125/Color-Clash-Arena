@@ -1,8 +1,9 @@
 using Photon.Pun;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
-public abstract class GameManager : MonoBehaviour {
+public abstract class GameManager : MonoBehaviourPun {
 
     [Header("References")]
     [SerializeField] private PlayerController playerPrefab; // must be inside the Resources/ folder
@@ -14,9 +15,10 @@ public abstract class GameManager : MonoBehaviour {
 
     [Header("Level")]
     [SerializeField] protected Level level;
+    private Vector3 currentRespawnPoint;
 
     [Header("Checkpoints")]
-    [SerializeField] private Transform playerSpawn;
+    [SerializeField] private Transform[] playerSpawns;
     [SerializeField] private Transform checkpointsParent;
     protected Checkpoint[] checkpoints;
     protected int currCheckpointIndex;
@@ -40,6 +42,9 @@ public abstract class GameManager : MonoBehaviour {
 
         PhotonNetwork.SendRate = 30; // frequency of outgoing packets
         PhotonNetwork.SerializationRate = 30; // frequency of OnPhotonSerializeView calls
+
+        if (playerSpawns.Length < Constants.MAX_PLAYERS_PER_ROOM)
+            Debug.LogError("Not enough player spawn points for max players per room! Please add more spawn points to the level or increase the max players per room in Constants.cs");
 
         // add all claimables to list
         levelClaimables = new List<Claimable>();
@@ -66,7 +71,9 @@ public abstract class GameManager : MonoBehaviour {
         foreach (PlayerController obj in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
             Destroy(obj.gameObject); // don't use PhotonNetwork.Destroy because these player controllers aren't networked objects until they are instantiated by PhotonNetwork.Instantiate
 
-        playerController = PhotonNetwork.Instantiate(playerPrefab.name, playerSpawn.position + new Vector3(0f, playerPrefab.transform.localScale.y / 2f, 0f), Quaternion.identity).GetComponent<PlayerController>(); // instantiate player prefab for multiplayer
+        currentRespawnPoint = GetUniqueRandomSpawn(); // get a unique random spawn point for this player
+
+        playerController = PhotonNetwork.Instantiate(playerPrefab.name, currentRespawnPoint + new Vector3(0f, playerPrefab.transform.localScale.y / 2f, 0f), Quaternion.identity).GetComponent<PlayerController>(); // instantiate player prefab for multiplayer
         playerController.Initialize(uiController, level.GetSpeedModifier(), level.GetJumpModifier(), level.IsUnderwater()); // initialize player controller
 
         uiController.Initialize(); // initialize UI controller after player controller so that the correct player controller is found by the UI controller
@@ -75,7 +82,6 @@ public abstract class GameManager : MonoBehaviour {
 
         // claims
         claimManager = playerController.GetComponent<PlayerClaimManager>(); // get claim manager from local player instead of FindFirstObjectByType to avoid getting remote player's component
-        claimManager.transform.position = playerSpawn.position;
 
         playerClaims = new List<PlayerClaim>();
         enemyClaims = new List<PhantomClaim>();
@@ -87,10 +93,6 @@ public abstract class GameManager : MonoBehaviour {
         // destroy existing enemies in scene (done for all clients, not just MasterClient)
         foreach (PhantomController obj in FindObjectsByType<PhantomController>(FindObjectsSortMode.None))
             Destroy(obj.gameObject); // don't use PhotonNetwork.Destroy because these enemies aren't networked objects until they are spawned by PhantomSpawn.SpawnEnemy
-
-        // only MasterClient spawns enemies; they are networked objects so spawning on all clients would create duplicates
-        if (PhotonNetwork.IsMasterClient)
-            SpawnEnemies();
 
         gameCore.ResetGravity(); // reset gravity to modify original gravity, not current one
         gameCore.ModifyGravity(level.GetGravityModifier());
@@ -125,6 +127,36 @@ public abstract class GameManager : MonoBehaviour {
 
     }
 
+    private Vector3 GetUniqueRandomSpawn() {
+
+        // use the room name as a seed so every client shuffles the list in the EXACT same order
+        int seed = PhotonNetwork.CurrentRoom.Name.GetHashCode();
+        System.Random rng = new System.Random(seed);
+
+        // create a list of indices and shuffle them
+        List<int> spawnIndices = Enumerable.Range(0, playerSpawns.Length).ToList();
+
+        // Fisher-Yates Shuffle algorithm
+        for (int i = spawnIndices.Count - 1; i > 0; i--) {
+
+            int k = rng.Next(i + 1);
+            //int value = spawnIndices[k];
+            //spawnIndices[k] = spawnIndices[i];
+            //spawnIndices[i] = value;
+
+            (spawnIndices[i], spawnIndices[k]) = (spawnIndices[k], spawnIndices[i]); // using a tuple swap to avoid needing a temporary variable
+
+        }
+
+        // use ActorNumber (1, 2, 3...) to pick an index from the shuffled list
+        // use modulo so if there are more players than spawns, they wrap around
+        int myIndex = (PhotonNetwork.LocalPlayer.ActorNumber - 1) % playerSpawns.Length;
+        int shuffledSpawnIndex = spawnIndices[myIndex];
+
+        return playerSpawns[shuffledSpawnIndex].position;
+
+    }
+
     public abstract void AddClaim(EntityClaim claim);
 
     public abstract void RemoveClaim(EntityClaim claim);
@@ -133,13 +165,13 @@ public abstract class GameManager : MonoBehaviour {
 
     public bool IsLevelCompleted() => levelCompleted;
 
-    public void SetLevelCompleted(bool levelCompleted) { this.levelCompleted = levelCompleted; }
+    public void SetLevelCompleted(bool levelCompleted) => this.levelCompleted = levelCompleted;
 
     public int GetLevelIndex() => level.GetLevelNumber();
 
-    public Vector3 GetPlayerSpawn() => playerSpawn.position;
+    public Vector3 GetPlayerSpawn() => currentRespawnPoint;
 
-    public void SetPlayerSpawn(Vector3 playerSpawn) { this.playerSpawn.position = playerSpawn; }
+    public void SetPlayerSpawn(Vector3 playerSpawn) => currentRespawnPoint = playerSpawn;
 
     public AudioClip GetBackgroundMusic() => level.GetBackgroundMusic();
 

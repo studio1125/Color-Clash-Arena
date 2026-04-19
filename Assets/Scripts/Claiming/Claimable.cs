@@ -5,7 +5,6 @@ using Photon.Pun;
 public class Claimable : MonoBehaviourPun {
 
     [Header("References")]
-    private PlayerHealthManager healthManager;
     private GameCore gameCore;
     private GameManager gameManager;
     private SpriteRenderer spriteRenderer;
@@ -13,6 +12,8 @@ public class Claimable : MonoBehaviourPun {
 
     [Header("Claiming")]
     [SerializeField] private float addedMultiplier;
+    private int currentClaimingActorId; // to track which player is currently claiming for the player claims, used to prevent overriding an ongoing claim with the same effect type; -1 means no ongoing claim
+    private EffectType? currentClaimingEffectType; // to track which effect type is currently claiming for the player claims, used to prevent overriding an ongoing claim with the same effect type; null means no ongoing claim
     private EntityType claimer;
 
     [Header("Animations")]
@@ -28,13 +29,13 @@ public class Claimable : MonoBehaviourPun {
         gameCore = FindFirstObjectByType<GameCore>();
         gameManager = FindFirstObjectByType<GameManager>();
 
+        currentClaimingActorId = -1; // initialize to -1 to indicate no ongoing claim
+
     }
 
     private void Start() {
 
-        healthManager = FindFirstObjectByType<PlayerHealthManager>();
         spriteRenderer = GetComponent<SpriteRenderer>();
-
         startColor = spriteRenderer.color;
 
     }
@@ -46,21 +47,37 @@ public class Claimable : MonoBehaviourPun {
         PlayerClaim playerClaim = GetComponent<PlayerClaim>();
         PhantomClaim phantomClaim = GetComponent<PhantomClaim>();
 
-        if ((entityType == EntityType.Player && ((playerClaim && playerClaim.GetEffectType() == effectType) || playerColorCoroutine != null || healthManager.IsDead())) || (entityType == EntityType.Phantom && (phantomClaim || phantomColorCoroutine != null))) // already claimed by entity (player done this way to make sure if effect types are different, they are still replaced)
-            return;
+        if (entityType == EntityType.Player) {
+
+            // if there's an existing claim, only return if it is the local player's and the effect is the same
+            if (playerClaim != null && playerClaim.GetOwnerId() == PhotonNetwork.LocalPlayer.ActorNumber && playerClaim.GetEffectType() == effectType)
+                return;
+
+            // also check if there's an ongoing lerp for the local player with the same effect type; if so, return to avoid overriding the existing lerp and registration
+            if (playerColorCoroutine != null && currentClaimingActorId == PhotonNetwork.LocalPlayer.ActorNumber && currentClaimingEffectType == effectType)
+                return;
+
+        } else if (entityType == EntityType.Phantom) {
+
+            // will only be here on the MasterClient
+
+            // if there's an existing claim and there is already an ongoing lerp, return
+            if (phantomClaim != null || phantomColorCoroutine != null)
+                return;
+
+        }
 
         // send claim to all clients so the lerp and registration happen everywhere
         // effectType is sent as int since Photon can't serialize nullable enums; -1 means null
         // also send the actor number of the claiming player
-        photonView.RPC(nameof(RPC_Claim), RpcTarget.All, (int) entityType, claimColor.r, claimColor.g, claimColor.b, effectType.HasValue ? (int) effectType.Value : -1, PhotonNetwork.LocalPlayer.ActorNumber);
+        photonView.RPC(nameof(RPC_Claim), RpcTarget.All, entityType, claimColor.r, claimColor.g, claimColor.b, effectType.HasValue ? (int) effectType.Value : -1, PhotonNetwork.LocalPlayer.ActorNumber);
 
     }
 
     // RPC: runs on all clients to start the claim lerp and register the claim when it finishes
     [PunRPC]
-    private void RPC_Claim(int entityTypeInt, float r, float g, float b, int effectTypeInt, int ownerId) {
+    private void RPC_Claim(EntityType entityType, float r, float g, float b, int effectTypeInt, int ownerId) {
 
-        EntityType entityType = (EntityType) entityTypeInt;
         Color claimColor = new Color(r, g, b);
         EffectType? effectType = effectTypeInt == -1 ? (EffectType?) null : (EffectType) effectTypeInt;
 
@@ -94,6 +111,10 @@ public class Claimable : MonoBehaviourPun {
 
     private IEnumerator StartClaim(EntityType entityType, EffectType? effectType, Color claimColor, float claimDuration, int ownerId) {
 
+        // set at the start of the claim so that if another claim with the same effect type is attempted by the same player while this claim is still lerping, it will be prevented
+        currentClaimingActorId = ownerId;
+        currentClaimingEffectType = effectType;
+
         float currentTime = 0f;
         Color startColor = spriteRenderer.color;
 
@@ -110,6 +131,7 @@ public class Claimable : MonoBehaviourPun {
 
         if (entityType == EntityType.Player)
             playerColorCoroutine = null;
+
         if (entityType == EntityType.Phantom)
             phantomColorCoroutine = null;
 
@@ -156,16 +178,21 @@ public class Claimable : MonoBehaviourPun {
             if (claim != entityClaim)
                 return;
 
-        if (entityClaim is PlayerClaim && playerColorCoroutine != null)
+        if (entityClaim is PlayerClaim && playerColorCoroutine != null) {
+
+            currentClaimingActorId = -1; // reset to -1 to indicate no ongoing claim
+            currentClaimingEffectType = null; // reset to null to indicate no ongoing claim
             StopCoroutine(playerColorCoroutine);
+
+        }
+
         if (entityClaim is PhantomClaim && phantomColorCoroutine != null)
             StopCoroutine(phantomColorCoroutine);
 
         if (resetCoroutine != null)
             StopCoroutine(resetCoroutine);
 
-        // RPC the reset so the lerp back to start color plays on all clients
-        photonView.RPC(nameof(RPC_ResetClaim), RpcTarget.All, startColor.r, startColor.g, startColor.b);
+        photonView.RPC(nameof(RPC_ResetClaim), RpcTarget.All, startColor.r, startColor.g, startColor.b); // RPC the reset so the lerp back to start color plays on all clients
 
     }
 

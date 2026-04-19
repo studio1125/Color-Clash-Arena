@@ -603,6 +603,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3640a6e2d0cd3d4b9b08688d9c72eee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  useMouseAiming: 1
+  reloadAimMultiplier: 0.2
   starterGuns:
   - {fileID: -7252344389506710391, guid: ea128f21d0afba14f9371e2ce5316cef, type: 3}
   - {fileID: 7837060837916375440, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
@@ -755,6 +757,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8770193713029372868}
+  - component: {fileID: 6164867602991443594}
+  - component: {fileID: 2335786411073758447}
   m_Layer: 7
   m_Name: GunSlot
   m_TagString: Untagged
@@ -778,6 +782,45 @@ Transform:
   - {fileID: 1178390833079671846}
   m_Father: {fileID: 1761575009889257618}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6164867602991443594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8575916944883555167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa584fbee541324448dd18d8409c7a41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.PhotonView
+  ObservedComponentsFoldoutOpen: 1
+  Group: 0
+  prefixField: -1
+  Synchronization: 3
+  OwnershipTransfer: 0
+  observableSearch: 2
+  ObservedComponents:
+  - {fileID: 2335786411073758447}
+  sceneViewId: 0
+  InstantiationId: 0
+  isRuntimeInstantiated: 0
+--- !u!114 &2335786411073758447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8575916944883555167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 627855c7f81362d41938ffe0b1475957, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.PhotonTransformView
+  m_SynchronizePosition: 0
+  m_SynchronizeRotation: 1
+  m_SynchronizeScale: 0
+  m_UseLocal: 1
 --- !u!1 &9157071015671833021
 GameObject:
   m_ObjectHideFlags: 0
@@ -1015,6 +1058,10 @@ PrefabInstance:
     - target: {fileID: 7147479033992212892, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
       propertyPath: m_Name
       value: SMG
+      objectReference: {fileID: 0}
+    - target: {fileID: 7837060837916375440, guid: a042358fb58fb644a8ca434a8b19717f, type: 3}
+      propertyPath: aimFollowSpeed
+      value: 14
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

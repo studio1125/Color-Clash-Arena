@@ -63,6 +63,18 @@ public class PlayerClaimManager : MonoBehaviourPun {
 
     }
 
+    public int GetTotalClaims() {
+
+        int totalClaims = 0;
+
+        // sum up all claims from different colors to get total claims
+        foreach (KeyValuePair<Color, int> claim in claims)
+            totalClaims += claim.Value;
+
+        return totalClaims;
+
+    }
+
     public Dictionary<Color, int> GetClaims() => claims;
 
 }

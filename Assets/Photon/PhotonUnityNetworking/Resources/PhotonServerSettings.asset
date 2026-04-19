@@ -61,6 +61,19 @@ MonoBehaviour:
   - RPC_SyncPhantomReload
   - RPC_SyncPlayerReload
   - RPC_StartReload
+  - RPC_ReportReady
+  - RPC_SyncStart
+  - RPC_PhantomArrived
+  - RPC_PhantomLeft
+  - RPC_PlayerArrived
+  - RPC_PlayerLeft
+  - RPC_SetState
+  - RPC_SetContested
+  - RPC_SubmitSignal
+  - RPC_RequestClaim
+  - RPC_StartClaimResolved
+  - RPC_UpdateScore
+  - RPC_UpdateRemoteScore
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1

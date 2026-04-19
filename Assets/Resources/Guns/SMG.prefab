@@ -283,6 +283,7 @@ MonoBehaviour:
   gunData: {fileID: 11400000, guid: 019bf7bbe59dfa549b0fecbd88b9ddda, type: 2}
   muzzle: {fileID: 2734364196730048453}
   bulletPrefab: {fileID: 250590204637249295, guid: 437c23eddbd465a45ae8ebe32682dcc3, type: 3}
+  weightAimFactor: 20
   bulletTracer: {fileID: 6173110162210112016}
   bulletTracerDisplayDuration: 0.02
   impactEffect: {fileID: 2066180300524992171, guid: f25a3225b657042489bbae36fa5e402a, type: 3}

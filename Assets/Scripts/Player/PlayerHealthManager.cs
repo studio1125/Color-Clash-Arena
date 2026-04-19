@@ -62,7 +62,7 @@ public class PlayerHealthManager : HealthManager {
         if (pendingHealthUpdate) {
 
             pendingHealthUpdate = false;
-            uiController.UpdateHealth(this); // flush the health update that was missed before ui was ready
+            uiController.UpdateHealth(); // flush the health update that was missed before ui was ready
 
         }
     }
@@ -112,11 +112,11 @@ public class PlayerHealthManager : HealthManager {
         // clear all player claims
         List<PlayerClaim> playerClaims = gameManager.GetPlayerClaims();
 
-        foreach (PlayerClaim claim in playerClaims.ToList())
+        foreach (PlayerClaim claim in playerClaims.ToList()) // use ToList() to avoid InvalidOperationException
             Destroy(claim);
 
         // reload all weapons
-        foreach (Gun gun in gunManager.GetGuns().ToList())
+        foreach (Gun gun in gunManager.GetGuns().ToList()) // use ToList() to avoid InvalidOperationException
             gun.InstantReload();
 
         rb.linearVelocity = Vector2.zero; // reset velocity
@@ -148,7 +148,7 @@ public class PlayerHealthManager : HealthManager {
         }
 
         pendingHealthUpdate = false; // clear flag; we're executing successfully
-        uiController.UpdateHealth(this);
+        uiController.UpdateHealth();
 
     }
 

@@ -13,6 +13,7 @@ public class PlayerController : MonoBehaviourPun {
 
     [Header("References")]
     [SerializeField] private GameObject marker;
+    private PlayerGunManager gunManager;
     private GameCore gameCore;
     private CameraController cameraController;
     private UIController uiController;
@@ -50,22 +51,13 @@ public class PlayerController : MonoBehaviourPun {
     [SerializeField] private KeyCode pauseKey;
 
     /*
-    IMPORTANT:
-        - PLAYER MUST START FACING RIGHT
+    IMPORTANT: PLAYER MUST START FACING RIGHT
     */
 
-    public void Initialize(UIController uiController, float speedModifier, float jumpModifier, bool isLevelUnderwater) { // to initialize ui controller
-
-        this.uiController = uiController;
-        this.moveSpeed *= speedModifier;
-        this.jumpForce *= jumpModifier;
-
-        if (isLevelUnderwater)
-            InvokeRepeating(nameof(SpawnBreatheParticles), 0f, breatheWaitDuration);
-
-    }
-
     private void Awake() {
+
+        gunManager = GetComponent<PlayerGunManager>();
+        rb = GetComponent<Rigidbody2D>();
 
         // set up mechanic statuses early so scripts can change them earlier too
         mechanicStatuses = new Dictionary<MechanicType, bool>();
@@ -78,12 +70,26 @@ public class PlayerController : MonoBehaviourPun {
 
     }
 
+    public void Initialize(UIController uiController, float speedModifier, float jumpModifier, bool isLevelUnderwater) { // to initialize ui controller
+
+        this.uiController = uiController;
+        this.moveSpeed *= speedModifier;
+        this.jumpForce *= jumpModifier;
+
+        // register the local player with the UI controller
+        if (photonView.IsMine)
+            uiController.RegisterLocalPlayer(this);
+
+        if (isLevelUnderwater)
+            InvokeRepeating(nameof(SpawnBreatheParticles), 0f, breatheWaitDuration);
+
+    }
+
     private void Start() {
 
         gameCore = FindFirstObjectByType<GameCore>();
         cameraController = FindFirstObjectByType<CameraController>();
         animator = GetComponent<Animator>();
-        rb = GetComponent<Rigidbody2D>();
 
         isFacingRight = true;
 
@@ -141,12 +147,29 @@ public class PlayerController : MonoBehaviourPun {
 
     private void CheckFlip() {
 
-        if (isFacingRight && horizontalInput < 0f || !isFacingRight && horizontalInput > 0f) {
+        if (gunManager.UseMouseAiming()) {
 
-            transform.Rotate(0f, 180f, 0f);
-            isFacingRight = !isFacingRight; // breaks when there are errors
+            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+
+            // if mouse is to the left and the player is facing right, OR mouse is right and the player is facing left, flip the player
+            if (mousePos.x < transform.position.x && isFacingRight)
+                Flip();
+            else if (mousePos.x > transform.position.x && !isFacingRight)
+                Flip();
+
+        } else {
+
+            if (isFacingRight && horizontalInput < 0f || !isFacingRight && horizontalInput > 0f)
+                Flip();
 
         }
+    }
+
+    private void Flip() {
+
+        transform.Rotate(0f, 180f, 0f);
+        isFacingRight = !isFacingRight; // breaks when there are errors
+
     }
 
     private void Jump() => rb.linearVelocity = transform.up * new Vector2(rb.linearVelocity.x, jumpForce); // multiply by transform.up to make sure jump is always up relative to player
@@ -172,9 +195,9 @@ public class PlayerController : MonoBehaviourPun {
 
     }
 
-    public Transform GetLeftFoot() { return leftFoot; }
+    public Transform GetLeftFoot() => leftFoot;
 
-    public Transform GetRightFoot() { return rightFoot; }
+    public Transform GetRightFoot() => rightFoot;
 
     public bool IsMechanicEnabled(MechanicType mechanicType) {
 
@@ -259,6 +282,17 @@ public class PlayerController : MonoBehaviourPun {
         uiController.DisableHealthBarHUD();
 
     }
+
+    public void SetKinematic(bool isKinematic) {
+
+        if (isKinematic)
+            rb.bodyType = RigidbodyType2D.Kinematic;
+        else
+            rb.bodyType = RigidbodyType2D.Dynamic;
+
+    }
+
+    public bool IsFacingRight() => isFacingRight;
 
     private void SpawnBreatheParticles() => Instantiate(breatheParticlesPrefab, breatheParticlesSpawn.position, Quaternion.Euler(0f, 90f, 0f), transform);
 

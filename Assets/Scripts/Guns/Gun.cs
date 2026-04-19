@@ -14,6 +14,7 @@ public class Gun : MonoBehaviour {
     [Header("Shooting")]
     [SerializeField] private Transform muzzle;
     [SerializeField] private Bullet bulletPrefab; // must be inside the Resources/ folder
+    [SerializeField, Tooltip("How heavy the gun feels when aiming; this will decide how snappy the aiming feels; higher is faster (more snappy), lower is slower (more floaty)")] private float weightAimFactor;
     private EntityType entityType;
     private LayerMask shootableMask;
     private int gunIndex;
@@ -78,7 +79,19 @@ public class Gun : MonoBehaviour {
 
         if (gunData.UsesRaycastShooting()) {
 
-            RaycastHit2D shootableHit = Physics2D.Raycast(muzzle.position, muzzle.right, gunData.GetMaxRange(), shootableMask); // for checking if a shootable is hit
+            RaycastHit2D[] shootableHits = Physics2D.RaycastAll(muzzle.position, muzzle.right, gunData.GetMaxRange(), shootableMask); // get all shootable hits (ordered by distance)
+            RaycastHit2D shootableHit = new RaycastHit2D(); // initialize shootableHit to a default value in case there are no valid hits
+
+            foreach (RaycastHit2D hit in shootableHits) {
+
+                if (hit.collider != collider) {
+
+                    shootableHit = hit;
+                    break;
+
+                }
+            }
+
             RaycastHit2D obstacleHit = Physics2D.Raycast(muzzle.position, muzzle.right, gunData.GetMaxRange(), gameCore.GetEnvironmentMask()); // for checking if an obstacle is in the way
 
             Vector2 tracerStart = muzzle.position;
@@ -151,7 +164,7 @@ public class Gun : MonoBehaviour {
 
     }
 
-    private bool CanReload() => currAmmo < gunData.GetMagazineSize() && !isReloading;
+    public bool CanReload() => currAmmo < gunData.GetMagazineSize() && !isReloading;
 
     public void StartReload() => StartCoroutine(Reload());
 
@@ -161,8 +174,7 @@ public class Gun : MonoBehaviour {
 
         isReloading = true;
 
-        // play the visual part of the reload on this client
-        yield return StartCoroutine(PlayReloadAnimation());
+        yield return StartCoroutine(PlayReloadAnimation()); // play the visual part of the reload on this client
 
         currAmmo = GetMagazineSize(); // reload gun
 
@@ -209,6 +221,8 @@ public class Gun : MonoBehaviour {
     public int GetCurrentAmmo() => currAmmo;
 
     public int GetMagazineSize() => gunData.GetMagazineSize();
+
+    public float GetWeightAimFactor() => weightAimFactor;
 
     public bool IsReloading() => isReloading;
 

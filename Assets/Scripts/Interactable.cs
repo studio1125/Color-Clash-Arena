@@ -4,7 +4,6 @@ using UnityEngine;
 public abstract class Interactable : MonoBehaviour {
 
     [Header("References")]
-    protected PlayerController playerController;
     private Coroutine fadeCoroutine;
 
     [Header("Icon")]
@@ -12,12 +11,7 @@ public abstract class Interactable : MonoBehaviour {
     [SerializeField] protected float iconFadeDuration;
     private bool isVisible;
 
-    protected void Awake() {
-
-        playerController = FindFirstObjectByType<PlayerController>();
-        interactKeyIcon.gameObject.SetActive(false);
-
-    }
+    protected void Awake() => interactKeyIcon.gameObject.SetActive(false);
 
     public abstract void Interact();
 

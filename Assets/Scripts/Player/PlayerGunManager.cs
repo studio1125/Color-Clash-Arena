@@ -12,6 +12,10 @@ public class PlayerGunManager : MonoBehaviourPun {
     private new Collider2D collider;
     private UIController uiController;
 
+    [Header("Aiming")]
+    [SerializeField] private bool useMouseAiming;
+    [SerializeField] private float reloadAimMultiplier;
+
     [Header("Guns")]
     [SerializeField] private List<Gun> starterGuns; // DON'T USE GUNS FROM THIS, THEY AREN'T INSTANTIATED
     [SerializeField] private Transform gunSlot;
@@ -25,24 +29,14 @@ public class PlayerGunManager : MonoBehaviourPun {
     [Header("Deferred Updates")]
     private bool pendingVisualUpdate; // set true when UpdateGunVisual fires before guns or uiController are ready
 
-    private void Awake() {
-
-        // initialize the list in Awake so GetGuns() never returns null if called before Start
-        // (UIController.Initialize -> UpdateGunHUD can fire before Start runs on a networked object)
-        guns = new List<Gun>();
-
-        // get UI controller reference for the local player; doing it here in case uiController reference is needed before it is initialized
-        if (photonView.IsMine)
-            uiController = FindFirstObjectByType<UIController>();
-
-    }
-
     private void Start() {
 
         colorManager = GetComponent<PlayerColorManager>();
         playerController = GetComponent<PlayerController>();
         effectManager = GetComponent<PlayerEffectManager>();
         collider = GetComponent<Collider2D>();
+
+        guns = new List<Gun>();
 
         // guns are instantiated locally on every client (gun visuals aren't networked objects)
         foreach (Gun gun in starterGuns)
@@ -71,6 +65,9 @@ public class PlayerGunManager : MonoBehaviourPun {
         if (!photonView.IsMine) return; // only allow local player to shoot and cycle guns
 
         if (playerController.IsMechanicEnabled(MechanicType.Guns)) { // don't return if false to allow for more code to be added to this method later
+
+            if (useMouseAiming && !guns[currGunIndex].IsReloading())
+                HandleGunRotation();
 
             // shooting (pass a callback so Gun can hand back the tracer endpoints for network sync & a callback for reload start to sync that as well)
             if (guns[currGunIndex].IsAutomatic() ? Input.GetMouseButton(0) : Input.GetMouseButtonDown(0)) {
@@ -108,13 +105,37 @@ public class PlayerGunManager : MonoBehaviourPun {
                 CycleNextGun();
 
             // gun reloading
-            if (Input.GetKeyDown(reloadKey)) {
+            if (Input.GetKeyDown(reloadKey) && guns[currGunIndex].CanReload()) { // only sync if reload will actually happen
 
                 guns[currGunIndex].StartReload();
                 SendReloadToOthers(currGunIndex); // sync animation to other clients
 
             }
         }
+    }
+
+    private void HandleGunRotation() {
+
+        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition); // get mouse position in world space
+        Vector2 aimDirection = (mousePos - gunSlot.position).normalized; // get direction from gun to mouse; normalize for consistent rotation regardless of distance
+
+        float gunAngle = Mathf.Atan2(aimDirection.y, aimDirection.x) * Mathf.Rad2Deg; // convert to angle in degrees
+        Quaternion targetRotation;
+
+        // if player is facing left, flip the gun vertically by rotating 180 degrees and subtracting the angle from 180 to mirror it; if facing right, just rotate by the angle
+        if (!playerController.IsFacingRight())
+            targetRotation = Quaternion.Euler(0f, 0f, 180f - gunAngle);
+        else
+            targetRotation = Quaternion.Euler(0f, 0f, gunAngle);
+
+        float currentSpeed = guns[currGunIndex].GetWeightAimFactor();
+
+        // apply reload multiplier if the current gun is reloading
+        if (guns[currGunIndex].IsReloading())
+            currentSpeed *= reloadAimMultiplier;
+
+        gunSlot.localRotation = Quaternion.Slerp(gunSlot.localRotation, targetRotation, currentSpeed * Time.deltaTime); // rotate towards target rotation at a speed of aimFollowSpeed degrees per second (multiplied by 100 to make the inspector variables more readable)
+
     }
 
     private void AddGun(Gun gun) {
@@ -239,5 +260,7 @@ public class PlayerGunManager : MonoBehaviourPun {
     }
 
     public List<Gun> GetGuns() => guns;
+
+    public bool UseMouseAiming() => useMouseAiming;
 
 }

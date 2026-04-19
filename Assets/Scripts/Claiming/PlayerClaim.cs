@@ -33,8 +33,6 @@ public class PlayerClaim : EntityClaim {
 
     public EffectType GetEffectType() => effectType;
 
-    public bool IsOwner(int playerId) => ownerId == playerId;
-
     public int GetOwnerId() => ownerId;
 
     public float GetMultiplierAddition() => multiplierAddition;

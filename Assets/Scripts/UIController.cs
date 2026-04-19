@@ -1,11 +1,12 @@
+using Photon.Pun;
+using Photon.Realtime;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using Photon.Pun;
 
-public class UIController : MonoBehaviour {
+public class UIController : MonoBehaviourPun {
 
     [Header("References")]
     private PlayerClaimManager claimManager;
@@ -24,6 +25,16 @@ public class UIController : MonoBehaviour {
     [Header("HUD")]
     [SerializeField] private CanvasGroup playerHUD;
     [SerializeField] private float playerHUDFadeDuration;
+
+    [Header("Score")]
+    [SerializeField] private TMP_Text localScoreText;
+    [SerializeField] private TMP_Text remoteScoreText;
+
+    [Header("Countdown")]
+    [SerializeField] private TMP_Text countdownText;
+    [SerializeField] private float countdownFadeDuration;
+    private CanvasGroup countdownTextGroup;
+    private Coroutine countdownFadeCoroutine;
 
     [Header("Claimables")]
     [SerializeField] private CanvasGroup claimablesInfoParent;
@@ -101,27 +112,23 @@ public class UIController : MonoBehaviour {
     [SerializeField] private Button nextLevelButton;
     [SerializeField] private Color disabledColor;
 
+    public void RegisterLocalPlayer(PlayerController playerController) { // called by PlayerController in Awake to register the local player reference for this UIController
+
+        this.playerController = playerController;
+        claimManager = playerController.GetComponent<PlayerClaimManager>();
+        colorManager = playerController.GetComponent<PlayerColorManager>();
+        effectManager = playerController.GetComponent<PlayerEffectManager>();
+        gunManager = playerController.GetComponent<PlayerGunManager>();
+        healthManager = playerController.GetComponent<PlayerHealthManager>();
+
+    }
+
     public void Initialize() {
 
         gameCore = FindFirstObjectByType<GameCore>();
         gameManager = FindFirstObjectByType<GameManager>();
         animator = GetComponent<Animator>();
-
-        // find the local player specifically; in multiplayer there will be multiple PlayerControllers so we use photonView.IsMine to get only the one this client controls
-        foreach (PlayerController playerController in FindObjectsByType<PlayerController>(FindObjectsSortMode.None)) {
-
-            if (playerController.GetComponent<PhotonView>().IsMine) {
-
-                this.playerController = playerController;
-                claimManager = playerController.GetComponent<PlayerClaimManager>();
-                colorManager = playerController.GetComponent<PlayerColorManager>();
-                effectManager = playerController.GetComponent<PlayerEffectManager>();
-                gunManager = playerController.GetComponent<PlayerGunManager>();
-                healthManager = playerController.GetComponent<PlayerHealthManager>();
-                break;
-
-            }
-        }
+        countdownTextGroup = countdownText.GetComponent<CanvasGroup>();
 
         // player HUD
         playerHUD.alpha = 0f; // reset alpha for fade
@@ -131,6 +138,10 @@ public class UIController : MonoBehaviour {
         DisableClaimablesInfoHUD(); // disabled by default
         DisableGunCycleHUD(); // disabled by default
         DisableHealthBarHUD(); // disabled by default
+
+        // countdown
+        countdownText.gameObject.SetActive(false); // hide countdown text by default
+        countdownTextGroup.alpha = 0f; // reset alpha for fade
 
         // set health slider values
         healthSlider.maxValue = healthManager.GetMaxHealth();
@@ -222,6 +233,28 @@ public class UIController : MonoBehaviour {
 
     }
 
+    public void ShowCountdown() {
+
+        countdownText.gameObject.SetActive(true);
+
+        if (countdownFadeCoroutine != null) StopCoroutine(countdownFadeCoroutine); // stop any existing countdown fade coroutines
+        countdownFadeCoroutine = StartCoroutine(FadeElement(countdownTextGroup, 1f, countdownFadeDuration)); // fade in countdown text
+
+    }
+
+    public void HideCountdown() {
+
+        if (countdownFadeCoroutine != null) StopCoroutine(countdownFadeCoroutine); // stop any existing countdown fade coroutines
+        countdownFadeCoroutine = StartCoroutine(FadeElement(countdownTextGroup, 0f, countdownFadeDuration)); // fade out countdown text
+
+    }
+
+    public void UpdateCountdown(float countdown) => countdownText.text = countdown.ToString();
+
+    public void UpdateLocalScore(int localScore) => localScoreText.text = localScore.ToString();
+
+    public void UpdateRemoteScore(int remoteScore) => remoteScoreText.text = remoteScore.ToString();
+
     public void UpdateClaimablesHUD() {
 
         if (gameCore.IsQuitting()) return; // don't update claimables & multipliers HUD if game is quitting
@@ -299,7 +332,7 @@ public class UIController : MonoBehaviour {
 
     }
 
-    public void UpdateHealth(HealthManager healthManager) { // health manager is passed in to ensure that the health update is for the correct player
+    public void UpdateHealth() {
 
         if (healthLerpCoroutine != null)
             StopCoroutine(healthLerpCoroutine);
@@ -484,7 +517,7 @@ public class UIController : MonoBehaviour {
         loadingScreenCoroutine = StartCoroutine(FadeLoadingScreen(1f, loadingScreenFadeDuration, LoadingCompleteAction.FinishMainMenuLoad)); // fade in loading screen (no need for unscaled time since the game is unpaused when the pause menu is closed)
 
         //loadingTextCoroutine = StartCoroutine(UpdateLoadingText()); // REMEMBER TO STOP THIS COROUTINE BEFORE NEW SCENE LOADS
-        gameCore.StartLoadMainMenuAsync(); // load first level
+        gameCore.StartLoadMainMenuAsync();
 
     }
 
